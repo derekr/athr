@@ -254,7 +254,7 @@ bun run build        # Build self-contained binary
 
 A music player with continuous playback, multi-window sync, and browser media controls -- built without React, Vue, Svelte, or any client-side framework. Datastar + SSE morphing delivers the interactivity. The server renders HTML. The client renders HTML. That's it.
 
-The total client-side JavaScript is Datastar (33KB from CDN) plus a small inline script for audio event listeners and Media Session API. No build step for client code. No bundler. No hydration.
+The total client-side JavaScript is Datastar (~14KB gzipped from CDN) plus a small inline script for audio event listeners and Media Session API. No build step for client code. No bundler. No hydration.
 
 ### Your backend stack matters more than you think
 
