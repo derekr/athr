@@ -248,6 +248,43 @@ bun run lint         # Lint (oxlint)
 bun run build        # Build self-contained binary
 ```
 
+## Takeaways
+
+### The hypermedia model works
+
+A music player with continuous playback, multi-window sync, and browser media controls -- built without React, Vue, Svelte, or any client-side framework. Datastar + SSE morphing delivers the interactivity. The server renders HTML. The client renders HTML. That's it.
+
+The total client-side JavaScript is Datastar (33KB from CDN) plus a small inline script for audio event listeners and Media Session API. No build step for client code. No bundler. No hydration.
+
+### Your backend stack matters more than you think
+
+This project was built with Bun + Hono -- a productive, fast JS runtime. But for a **locally-run desktop application**, the choice of backend technology has implications that go beyond developer ergonomics:
+
+**HTTP/2**: Bun's HTTP server is HTTP/1.1 only. SSE connections are subject to the browser's 6-connection-per-domain limit. With 4+ popup windows, you're close to the ceiling. In Go, you'd embed [Caddy](https://caddyserver.com/) as a library and get HTTP/2 (plus automatic TLS) for free in the same binary -- no reverse proxy, no sidecar process.
+
+**Single binary distribution**: Bun can compile to a standalone binary via `bun build --compile`, but you can't embed native dependencies. Go's static linking lets you embed an HTTP/2 server, a NATS message bus, a reverse proxy, and your application logic into one binary with zero runtime dependencies.
+
+**Multiplexing**: The SSE connection limit is an HTTP/1.1 constraint that HTTP/2 eliminates entirely (all streams multiplex over one TCP connection). For a local app where you control the server, this is a solved problem in Go -- but an open problem in the JS runtime ecosystem.
+
+**The workaround in JS-land**: A `SharedWorker` can hold a single SSE connection and broadcast to all windows via `postMessage`, solving the connection limit on the client side without HTTP/2. It works, but it's a workaround for a transport limitation that the right backend stack wouldn't have.
+
+### The architecture is runtime-agnostic
+
+The patterns demonstrated here -- CQRS, event sourcing, SSE morphing, server-controlled URLs, popup windows as separate documents -- are not tied to Bun, Hono, or even JavaScript. The same architecture in Go + [Templ](https://templ.guide/) + Datastar + embedded Caddy would eliminate the HTTP/1.1 constraints while keeping the hypermedia model intact. The architectural ideas are the point; the runtime is interchangeable.
+
+### What Datastar gets right
+
+- **SSE as the transport**: Server pushes HTML, not JSON. No client-side rendering layer.
+- **Signals for the imperative gap**: The `<audio>` API requires method calls (`play()`, `pause()`). Signals bridge server state to browser APIs without client-side state management.
+- **Morphing preserves DOM state**: `data-ignore-morph` on `<audio>` means the element survives content updates. No framework needed to manage this -- the DOM is the state.
+
+### What event sourcing enables
+
+- **Time-travel debugging**: Every user action is an immutable event. Replay the log to reproduce any state.
+- **Projection flexibility**: Change how you read data without migrating. Add a new projection, rebuild from events.
+- **Agent-friendly operations**: An AI agent can query `SELECT * FROM events WHERE correlation_id = ?` to trace exactly what happened. No guessing about client-side state.
+- **Clean domain/telemetry separation**: Domain events (PlaybackStarted, TrackQueued) go in the event store. Position telemetry updates the projection directly and publishes to the bus. The event log stays meaningful.
+
 ## License
 
 MIT
