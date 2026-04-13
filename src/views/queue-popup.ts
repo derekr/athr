@@ -57,7 +57,7 @@ export function renderQueuePage(sessionId: string): string {
 <body data-init="@get('/s/${sessionId}/queue/sse')">
   <div class="header">
     <h1>Queue</h1>
-    <button data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'clear' })">
+    <button data-on:click__prevent="@post('/s/${sessionId}/queue/clear')">
       Clear All
     </button>
   </div>
@@ -104,10 +104,10 @@ export function renderQueueList(sessionId: string): string {
         <div class="duration">${formatDuration(track.duration_ms)}</div>
         <div class="actions">
           <button
-            data-on:click__prevent="@post('/s/${sessionId}/play', { trackId: '${track.track_id}' })"
+            data-on:click__prevent="@post('/s/${sessionId}/play/${track.track_id}')"
             title="Play">▶</button>
           <button
-            data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'remove', trackId: '${track.track_id}' })"
+            data-on:click__prevent="@post('/s/${sessionId}/queue/remove/${track.track_id}')"
             title="Remove">✕</button>
         </div>
       </div>

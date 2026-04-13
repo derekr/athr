@@ -60,15 +60,15 @@ export function renderPlayerChrome(sessionId: string): string {
   return /* html */ `
     <div class="player-transport">
       <button
-        data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'prev' })"
+        data-on:click__prevent="@post('/s/${sessionId}/playback/prev')"
         title="Previous">⏮</button>
       <button
-        data-on:click__prevent="@post('/s/${sessionId}/playback', { action: '${isPlaying ? "pause" : "resume"}' })"
+        data-on:click__prevent="@post('/s/${sessionId}/playback/${isPlaying ? "pause" : "resume"}')"
         title="${isPlaying ? "Pause" : "Play"}">
         ${isPlaying ? "⏸" : "▶"}
       </button>
       <button
-        data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'next' })"
+        data-on:click__prevent="@post('/s/${sessionId}/playback/next')"
         title="Next">⏭</button>
     </div>
 
@@ -78,22 +78,22 @@ export function renderPlayerChrome(sessionId: string): string {
     </div>
 
     <div class="player-progress">
-      <span class="time-label">${formatDuration(positionMs)}</span>
+      <span class="time-label" id="time-pos">${formatDuration(positionMs)}</span>
       <div class="progress-track"
            data-on:click__prevent="
-             const rect = this.getBoundingClientRect();
+             const rect = el.getBoundingClientRect();
              const pct = (evt.clientX - rect.left) / rect.width;
-             @post('/s/${sessionId}/playback', { action: 'seek', positionMs: Math.floor(pct * ${track.duration_ms}) })
+             @post('/s/${sessionId}/playback/seek/' + Math.floor(pct * ${track.duration_ms}))
            ">
-        <div class="progress-fill" style="width: ${progressPct.toFixed(2)}%;"></div>
+        <div class="progress-fill" id="progress-fill" style="width: ${progressPct.toFixed(2)}%;"></div>
       </div>
-      <span class="time-label">${formatDuration(track.duration_ms)}</span>
+      <span class="time-label" id="time-dur">${formatDuration(track.duration_ms)}</span>
     </div>
 
     <div class="player-volume">
       <span>🔊</span>
       <input type="range" min="0" max="100" value="${Math.round(playback.volume * 100)}"
-             data-on:input__throttle.500ms="@post('/s/${sessionId}/volume', { level: this.value / 100 })" />
+             data-on:input__throttle.500ms="@post('/s/${sessionId}/volume/' + (el.value / 100))" />
     </div>
   `;
 }
@@ -118,7 +118,7 @@ function renderEmptyPlayer(sessionId: string): string {
     <div class="player-volume">
       <span>🔊</span>
       <input type="range" min="0" max="100" value="100"
-             data-on:input__throttle.500ms="@post('/s/${sessionId}/volume', { level: this.value / 100 })" />
+             data-on:input__throttle.500ms="@post('/s/${sessionId}/volume/' + (el.value / 100))" />
     </div>
   `;
 }

@@ -1,4 +1,5 @@
 import { db } from "../app";
+import { getPlaybackProjection } from "../projections/playback";
 import { getSearchProjection } from "../projections/search";
 import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
@@ -28,6 +29,8 @@ export function renderSearchResults(
   }
 
   const results = JSON.parse(search.results) as SearchResultTrack[];
+  const playback = getPlaybackProjection(db, sessionId);
+  const currentTrackId = playback?.track_id ?? "";
 
   return /* html */ `
     <div class="search-view">
@@ -37,7 +40,7 @@ export function renderSearchResults(
           value="${escHtml(search.query)}"
           placeholder="Search tracks, albums, artists..."
           data-bind:_search-query
-          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches/${searchId}', { query: $_searchQuery })"
+          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches/${searchId}?q=' + encodeURIComponent($_searchQuery))"
         />
       </div>
 
@@ -58,8 +61,8 @@ export function renderSearchResults(
           ${results
             .map(
               (track) => /* html */ `
-            <div class="track-row"
-                 data-on:dblclick__prevent="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">
+            <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+                 data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
               <div class="track-num">♪</div>
               <div class="track-info">
                 <span class="track-name">${escHtml(track.title)}</span>
@@ -67,8 +70,8 @@ export function renderSearchResults(
               </div>
               <div class="track-duration">${formatDuration(track.duration_ms)}</div>
               <div class="track-actions">
-                <button data-on:click__prevent.stop="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">▶</button>
-                <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue', { action: 'add', trackId: '${track.id}' })">+</button>
+                <button data-on:click__prevent.stop="@post('/s/${sessionId}/play/${track.id}')">▶</button>
+                <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue/add/${track.id}')">+</button>
               </div>
             </div>
           `
@@ -90,7 +93,7 @@ function renderSearchEmpty(sessionId: string, query: string): string {
           value="${escHtml(query)}"
           placeholder="Search tracks, albums, artists..."
           data-bind:_search-query
-          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches', { query: $_searchQuery })"
+          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches?q=' + encodeURIComponent($_searchQuery))"
         />
       </div>
       <div class="empty-state">

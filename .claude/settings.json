@@ -7,11 +7,14 @@
           {
             "type": "command",
             "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if [[ \"$FILE\" == *.ts ]]; then ./node_modules/.bin/oxlint --fix \"$FILE\" 2>&1 || exit 2; fi",
-            "asyncRewake": true,
-            "statusMessage": "Linting..."
+            "statusMessage": "Linting...",
+            "asyncRewake": true
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "chrome-devtools-mcp@claude-plugins-official": true
   }
 }

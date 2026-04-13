@@ -11,37 +11,38 @@ import type { StoredEvent } from "../events/store";
 
 const router = new Hono();
 
-function sseEvent(eventName: string, data: string): string {
-  return `event: ${eventName}\ndata: ${data}\n\n`;
-}
-
 function patchElements(
   html: string,
   selector: string,
   mode: "inner" | "outer" = "inner"
 ): string {
-  return sseEvent(
-    "datastar-patch-elements",
-    JSON.stringify({ elements: html, selector, mode })
-  );
+  const lines = [`event: datastar-patch-elements`];
+  lines.push(`data: selector ${selector}`);
+  if (mode !== "outer") lines.push(`data: mode ${mode}`);
+  for (const line of html.split("\n")) {
+    lines.push(`data: elements ${line}`);
+  }
+  lines.push("", "");
+  return lines.join("\n");
 }
 
 function patchSignals(signals: Record<string, unknown>): string {
-  return sseEvent(
-    "datastar-patch-signals",
-    JSON.stringify({ signals })
-  );
+  const lines = [`event: datastar-patch-signals`];
+  lines.push(`data: signals ${JSON.stringify(signals)}`);
+  lines.push("", "");
+  return lines.join("\n");
 }
 
 /** GET /s/:id/sse — Main SSE stream for a session */
 router.get("/s/:id/sse", (c) => {
   const sessionId = c.req.param("id");
 
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
+  c.header("X-Accel-Buffering", "no");
+
   return stream(c, async (s) => {
-    c.header("Content-Type", "text/event-stream");
-    c.header("Cache-Control", "no-cache");
-    c.header("Connection", "keep-alive");
-    c.header("X-Accel-Buffering", "no");
 
     const session = getSessionProjection(db, sessionId);
     if (!session) {
@@ -76,9 +77,17 @@ router.get("/s/:id/sse", (c) => {
       `session:${sessionId}`,
       (event: StoredEvent) => {
         if (closed) return;
+        console.log(`[sse] event received: ${event.eventType} for ${sessionId}`);
         void handleEvent(event, s, sessionId);
       }
     );
+    console.log(`[sse] subscribed to session:${sessionId}`);
+
+    // Heartbeat keeps SSE connection alive (Bun idleTimeout)
+    const heartbeat = setInterval(() => {
+      if (closed) return;
+      void s.write(": heartbeat\n\n");
+    }, 15_000);
 
     // Keep alive until client disconnects
     await new Promise<void>((resolve) => {
@@ -86,6 +95,7 @@ router.get("/s/:id/sse", (c) => {
     });
 
     closed = true;
+    clearInterval(heartbeat);
     unsub();
   });
 });
@@ -111,6 +121,12 @@ async function handleEvent(
       const playerHtml = renderPlayerChrome(sessionId);
       await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
       await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      // Re-render content so now-playing indicator updates
+      const session = getSessionProjection(db, sessionId);
+      if (session) {
+        const contentHtml = renderView(sessionId, session);
+        await s.write(patchElements(contentHtml, "#content", "inner"));
+      }
       const data = event.data as { trackId: string; positionMs: number };
       await s.write(
         patchSignals({
@@ -169,11 +185,12 @@ async function handleEvent(
 router.get("/s/:id/queue/sse", (c) => {
   const sessionId = c.req.param("id");
 
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
+  c.header("X-Accel-Buffering", "no");
+
   return stream(c, async (s) => {
-    c.header("Content-Type", "text/event-stream");
-    c.header("Cache-Control", "no-cache");
-    c.header("Connection", "keep-alive");
-    c.header("X-Accel-Buffering", "no");
 
     const session = getSessionProjection(db, sessionId);
     if (!session) { await s.close(); return; }
@@ -196,11 +213,17 @@ router.get("/s/:id/queue/sse", (c) => {
       }
     );
 
+    const heartbeat = setInterval(() => {
+      if (closed) return;
+      void s.write(": heartbeat\n\n");
+    }, 15_000);
+
     await new Promise<void>((resolve) => {
       c.req.raw.signal.addEventListener("abort", () => resolve());
     });
 
     closed = true;
+    clearInterval(heartbeat);
     unsub();
   });
 });

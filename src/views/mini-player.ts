@@ -97,13 +97,13 @@ export function renderMiniChrome(sessionId: string): string {
 
   return /* html */ `
     <div class="mini-transport">
-      <button data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'prev' })" title="Previous">⏮</button>
+      <button data-on:click__prevent="@post('/s/${sessionId}/playback/prev')" title="Previous">⏮</button>
       <button class="play-pause"
-        data-on:click__prevent="@post('/s/${sessionId}/playback', { action: '${isPlaying ? "pause" : "resume"}' })"
+        data-on:click__prevent="@post('/s/${sessionId}/playback/${isPlaying ? "pause" : "resume"}')"
         title="${isPlaying ? "Pause" : "Play"}">
         ${isPlaying ? "⏸" : "▶"}
       </button>
-      <button data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'next' })" title="Next">⏭</button>
+      <button data-on:click__prevent="@post('/s/${sessionId}/playback/next')" title="Next">⏭</button>
     </div>
     <div class="mini-info">
       <div class="mini-title">${escHtml(track.title)}</div>

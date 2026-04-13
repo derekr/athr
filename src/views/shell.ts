@@ -7,14 +7,14 @@ const DATASTAR_CDN =
 const dataEffect = [
   "const audio = document.getElementById('audio');",
   "if (!audio) return;",
-  "if ($_trackUrl && audio.src !== $_trackUrl) {",
+  "if ($_trackUrl && !audio.src.endsWith($_trackUrl)) {",
   "  audio.src = $_trackUrl;",
   "  if ($_seekTo >= 0) audio.currentTime = $_seekTo / 1000;",
   "}",
   "if ($_isPlaying && audio.paused) audio.play().catch(() => {});",
   "if (!$_isPlaying && !audio.paused) audio.pause();",
   "audio.volume = $_volume;",
-  "if ($_seekTo >= 0 && $_trackUrl && audio.src === $_trackUrl) {",
+  "if ($_seekTo >= 0 && $_trackUrl && audio.src.endsWith($_trackUrl)) {",
   "  audio.currentTime = $_seekTo / 1000;",
   "  $_seekTo = -1;",
   "}",
@@ -30,6 +30,18 @@ export function renderShell(sessionId: string, session: SessionRow): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>athr</title>
   <script type="module" src="${DATASTAR_CDN}"></script>
+  <script type="module">
+    import { initLog, log } from '/public/evlog-client.js';
+    initLog({
+      service: 'athr-web',
+      transport: {
+        enabled: true,
+        endpoint: '/api/_evlog/ingest',
+      },
+    });
+    log.info({ action: 'app_init', path: window.location.pathname, sessionId: '${sessionId}' });
+    window.__evlog = log;
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -243,6 +255,14 @@ export function renderShell(sessionId: string, session: SessionRow): string {
       background: var(--surface2);
     }
 
+    .track-row.now-playing {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
+    .track-row.now-playing .track-num {
+      color: var(--accent);
+    }
+
     .track-row .track-num {
       color: var(--text-muted);
       font-size: 13px;
@@ -432,9 +452,33 @@ export function renderShell(sessionId: string, session: SessionRow): string {
 
     <audio id="audio"
            data-ignore-morph
-           data-on:ended__debounce.100ms="@post('/s/${sessionId}/playback', { action: 'next' })"
-           data-on:timeupdate__throttle.10s="@post('/s/${sessionId}/playback', { action: 'sync', positionMs: Math.floor(this.currentTime * 1000) })">
+           data-on:ended__debounce.100ms="@post('/s/${sessionId}/playback/next')">
     </audio>
+
+    <script>
+      (function() {
+        var audio = document.getElementById('audio');
+        console.log('[athr] progress script init, audio=', !!audio);
+        if (!audio) return;
+        function fmt(s) {
+          var m = Math.floor(s / 60);
+          var sec = Math.floor(s) % 60;
+          return m + ':' + (sec < 10 ? '0' : '') + sec;
+        }
+        audio.addEventListener('timeupdate', function() {
+          var fill = document.getElementById('progress-fill');
+          var elPos = document.getElementById('time-pos');
+          var dur = audio.duration || 0;
+          if (fill && dur > 0) fill.style.width = (audio.currentTime / dur * 100).toFixed(2) + '%';
+          if (elPos) elPos.textContent = fmt(audio.currentTime);
+        });
+        audio.addEventListener('loadedmetadata', function() {
+          console.log('[athr] loadedmetadata, duration=', audio.duration);
+          var elDur = document.getElementById('time-dur');
+          if (elDur) elDur.textContent = fmt(audio.duration || 0);
+        });
+      })();
+    </script>
 
     <div id="player-chrome">
       <!-- Morphed by SSE on playback events -->

@@ -1,4 +1,5 @@
 import { db } from "../app";
+import { getPlaybackProjection } from "../projections/playback";
 import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
 
@@ -37,6 +38,9 @@ export function renderAlbum(sessionId: string, albumId: string): string {
     return `<div class="empty-state"><div class="icon">💿</div><h2>Album not found</h2></div>`;
   }
 
+  const playback = getPlaybackProjection(db, sessionId);
+  const currentTrackId = playback?.track_id ?? "";
+
   const tracks = db
     .prepare(
       `SELECT t.id, t.title, t.track_number, t.duration_ms,
@@ -65,12 +69,12 @@ export function renderAlbum(sessionId: string, albumId: string): string {
           </div>
           <div style="margin-top: 12px; display: flex; gap: 8px;">
             <button
-              data-on:click__prevent="@post('/s/${sessionId}/play', { trackId: '${tracks[0]?.id ?? ""}' })"
+              data-on:click__prevent="@post('/s/${sessionId}/play/${tracks[0]?.id ?? ""}')"
               style="padding: 8px 16px; background: var(--accent); border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 14px;">
               ▶ Play
             </button>
             <button
-              data-on:click__prevent="@post('/s/${sessionId}/queue', { action: 'add_album', albumId: '${albumId}' })"
+              data-on:click__prevent="@post('/s/${sessionId}/queue/add-album/${albumId}')"
               style="padding: 8px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 14px;">
               + Queue All
             </button>
@@ -83,16 +87,16 @@ export function renderAlbum(sessionId: string, albumId: string): string {
       ${tracks
         .map(
           (track, i) => /* html */ `
-        <div class="track-row"
-             data-on:dblclick__prevent="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">
+        <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+             data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
           <div class="track-num">${track.track_number ?? i + 1}</div>
           <div class="track-info">
             <span class="track-name">${escHtml(track.title)}</span>
           </div>
           <div class="track-duration">${formatDuration(track.duration_ms)}</div>
           <div class="track-actions">
-            <button data-on:click__prevent.stop="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">▶</button>
-            <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue', { action: 'add', trackId: '${track.id}' })">+</button>
+            <button data-on:click__prevent.stop="@post('/s/${sessionId}/play/${track.id}')">▶</button>
+            <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue/add/${track.id}')">+</button>
           </div>
         </div>
       `

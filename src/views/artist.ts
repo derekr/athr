@@ -1,4 +1,5 @@
 import { db } from "../app";
+import { getPlaybackProjection } from "../projections/playback";
 import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
 
@@ -34,6 +35,9 @@ export function renderArtist(sessionId: string, artistId: string): string {
   if (!artist) {
     return `<div class="empty-state"><div class="icon">👤</div><h2>Artist not found</h2></div>`;
   }
+
+  const playback = getPlaybackProjection(db, sessionId);
+  const currentTrackId = playback?.track_id ?? "";
 
   const albums = db
     .prepare(
@@ -93,8 +97,8 @@ export function renderArtist(sessionId: string, artistId: string): string {
         ${tracks
           .map(
             (track) => /* html */ `
-          <div class="track-row"
-               data-on:dblclick__prevent="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">
+          <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+               data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
             <div class="track-num">♪</div>
             <div class="track-info">
               <span class="track-name">${escHtml(track.title)}</span>
@@ -102,8 +106,8 @@ export function renderArtist(sessionId: string, artistId: string): string {
             </div>
             <div class="track-duration">${formatDuration(track.duration_ms)}</div>
             <div class="track-actions">
-              <button data-on:click__prevent.stop="@post('/s/${sessionId}/play', { trackId: '${track.id}' })">▶</button>
-              <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue', { action: 'add', trackId: '${track.id}' })">+</button>
+              <button data-on:click__prevent.stop="@post('/s/${sessionId}/play/${track.id}')">▶</button>
+              <button data-on:click__prevent.stop="@post('/s/${sessionId}/queue/add/${track.id}')">+</button>
             </div>
           </div>
         `

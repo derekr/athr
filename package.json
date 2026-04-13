@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@starfederation/datastar-sdk": "^1.0.0-RC.3",
+    "evlog": "^2.12.0",
     "hono": "^4.12.12",
     "music-metadata": "^11.12.3"
   },

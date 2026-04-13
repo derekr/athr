@@ -64,9 +64,8 @@ router.post("/s/:id/searches", async (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
-  const body = await c.req.json<{ query: string; filters?: Record<string, string> }>().catch(() => null);
-  const query = body?.query ?? "";
-  const filters = body?.filters ?? {};
+  const query = c.req.query("q") ?? "";
+  const filters: Record<string, string> = {};
 
   const searchId = newSearchId();
   const correlationId = c.get("correlationId");
@@ -111,31 +110,14 @@ router.post("/s/:id/searches/:searchId", async (c) => {
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
   if (!getSearchProjection(db, searchId)) return c.text("Search not found", 404);
 
-  type RefinementBody = { query?: string; filters?: Record<string, string>; page?: number };
-  const body: RefinementBody = await c.req.json<RefinementBody>().catch(() => ({}));
-
+  const query = c.req.query("q");
   const correlationId = c.get("correlationId");
   const searchVersion = getSearchVersion(searchId);
 
-  if (body.page !== undefined) {
+  if (query !== undefined) {
     appendEvents(
       `search:${searchId}`,
-      [{ type: "SearchPageChanged", data: { page: body.page } }],
-      searchVersion,
-      correlationId
-    );
-  } else {
-    appendEvents(
-      `search:${searchId}`,
-      [
-        {
-          type: "SearchRefined",
-          data: {
-            ...(body.query !== undefined ? { query: body.query } : {}),
-            ...(body.filters !== undefined ? { filters: body.filters } : {}),
-          },
-        },
-      ],
+      [{ type: "SearchRefined", data: { query } }],
       searchVersion,
       correlationId
     );
@@ -143,9 +125,8 @@ router.post("/s/:id/searches/:searchId", async (c) => {
 
   // Re-run query with updated state
   const search = getSearchProjection(db, searchId)!;
-  const effectiveQuery = body.query ?? search.query;
-  const effectiveFilters =
-    body.filters ?? (JSON.parse(search.filters) as Record<string, string>);
+  const effectiveQuery = query ?? search.query;
+  const effectiveFilters = JSON.parse(search.filters) as Record<string, string>;
 
   const results = runQuery(effectiveQuery, effectiveFilters);
   updateSearchResults(db, searchId, results);

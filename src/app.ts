@@ -49,6 +49,7 @@ export function appendEvents(
   const appended = eventStore.append(streamId, events, expectedVersion, correlationId);
   for (const event of appended) {
     projectionEngine.apply(event);
+    console.log(`[bus] publishing ${event.eventType} to ${event.streamId}`);
     eventBus.publish(event);
   }
   return appended;
