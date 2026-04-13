@@ -49,12 +49,19 @@ bun run build
 
 ### Working through issues
 
-Issues live in `vault/athr/issues/` (numbered, with task checklists). Work through them in order. After completing each issue:
+Issues live in `vault/athr/issues/` (numbered, with task checklists). Epics live in `vault/athr/epics/`. Both use YAML frontmatter with a `status` field and an `updated` date.
 
-1. Run `bun test` — all tests must pass
-2. Run `bun run typecheck` — no type errors
-3. Run `bun run lint` — no lint errors
-4. Commit with a message referencing the issue, e.g. `implement event store (issue #001)`
+**Status values:** `todo` → `in_progress` → `done`
+
+Work through issues in order. For each issue:
+
+1. **Before starting**: set `status: in_progress` and `updated: <today>` in the issue frontmatter. If all issues in an epic are now started, set the epic to `in_progress` too.
+2. Implement the feature (TDD — write tests first or alongside).
+3. Run `bun test` — all tests must pass.
+4. Run `bun run typecheck` — no type errors.
+5. Run `bun run lint` — no lint errors.
+6. **After passing**: set `status: done` and `updated: <today>` in the issue frontmatter. If all issues in an epic are now `done`, set the epic to `done` too.
+7. Commit everything together (source + vault status update) with a message referencing the issue, e.g. `implement event store (issue #001)`.
 
 ### Test-driven development
 
