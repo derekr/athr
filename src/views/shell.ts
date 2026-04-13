@@ -433,18 +433,18 @@ export function renderShell(sessionId: string, session: SessionRow): string {
 <body>
   <nav id="nav">
     <span class="app-name">athr</span>
-    <button
+    <a href="/s/${sessionId}/library"
       data-on:click__prevent="@post('/s/${sessionId}/view/library')"
       id="nav-library"
       class="${["library", "album", "artist"].includes(session.current_view) ? "active" : ""}">
       Library
-    </button>
-    <button
+    </a>
+    <a href="/s/${sessionId}/search"
       data-on:click__prevent="@post('/s/${sessionId}/view/search')"
       id="nav-search"
       class="${session.current_view === "search" ? "active" : ""}">
       Search
-    </button>
+    </a>
     <button
       data-on:click="window.open('/s/${sessionId}/queue', 'queue', 'width=400,height=600')">
       Queue

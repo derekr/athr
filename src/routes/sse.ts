@@ -28,11 +28,11 @@ async function onViewChanged(s: Writer, sessionId: string): Promise<void> {
   const libClass = ["library", "album", "artist"].includes(v) ? "active" : "";
   const searchClass = v === "search" ? "active" : "";
   await s.write(patchElements(
-    `<button id="nav-library" data-on:click__prevent="@post('/s/${sessionId}/view/library')" class="${libClass}">Library</button>`,
+    `<a id="nav-library" href="/s/${sessionId}/library" data-on:click__prevent="@post('/s/${sessionId}/view/library')" class="${libClass}">Library</a>`,
     "#nav-library", "outer"
   ));
   await s.write(patchElements(
-    `<button id="nav-search" data-on:click__prevent="@post('/s/${sessionId}/view/search')" class="${searchClass}">Search</button>`,
+    `<a id="nav-search" href="/s/${sessionId}/search" data-on:click__prevent="@post('/s/${sessionId}/view/search')" class="${searchClass}">Search</a>`,
     "#nav-search", "outer"
   ));
 }
