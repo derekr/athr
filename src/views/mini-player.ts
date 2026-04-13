@@ -110,11 +110,11 @@ export function renderMiniChrome(sessionId: string): string {
       <div class="mini-artist">${escHtml(track.artist_name)}</div>
     </div>
     <div class="mini-progress">
-      <span class="time-label">${formatDuration(positionMs)}</span>
+      <span class="time-label" id="mini-time-pos">${formatDuration(positionMs)}</span>
       <div class="progress-track">
-        <div class="progress-fill" style="width: ${pct.toFixed(2)}%"></div>
+        <div class="progress-fill" id="mini-progress-fill" style="width: ${pct.toFixed(2)}%"></div>
       </div>
-      <span class="time-label">${formatDuration(track.duration_ms)}</span>
+      <span class="time-label" id="mini-time-dur">${formatDuration(track.duration_ms)}</span>
     </div>
   `;
 }

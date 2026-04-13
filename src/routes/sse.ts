@@ -154,6 +154,8 @@ async function handleEvent(
     case "PlaybackSeeked": {
       const data = event.data as { positionMs: number };
       await s.write(patchSignals({ _seekTo: data.positionMs }));
+      // Update mini player progress from server state
+      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
       break;
     }
     case "VolumeChanged": {

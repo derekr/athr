@@ -458,13 +458,13 @@ export function renderShell(sessionId: string, session: SessionRow): string {
     <script>
       (function() {
         var audio = document.getElementById('audio');
-        console.log('[athr] progress script init, audio=', !!audio);
         if (!audio) return;
         function fmt(s) {
           var m = Math.floor(s / 60);
           var sec = Math.floor(s) % 60;
           return m + ':' + (sec < 10 ? '0' : '') + sec;
         }
+        // Smooth local progress (sub-second)
         audio.addEventListener('timeupdate', function() {
           var fill = document.getElementById('progress-fill');
           var elPos = document.getElementById('time-pos');
@@ -473,9 +473,17 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           if (elPos) elPos.textContent = fmt(audio.currentTime);
         });
         audio.addEventListener('loadedmetadata', function() {
-          console.log('[athr] loadedmetadata, duration=', audio.duration);
           var elDur = document.getElementById('time-dur');
           if (elDur) elDur.textContent = fmt(audio.duration || 0);
+        });
+        // Sync position to server every 2s so other windows stay in sync
+        var lastSync = 0;
+        audio.addEventListener('timeupdate', function() {
+          var now = Date.now();
+          if (now - lastSync < 2000) return;
+          if (isNaN(audio.currentTime)) return;
+          lastSync = now;
+          fetch('/s/${sessionId}/playback/sync/' + Math.floor(audio.currentTime * 1000), { method: 'POST', keepalive: true });
         });
       })();
     </script>
