@@ -43,7 +43,8 @@ export function renderQueuePage(sessionId: string): string {
     .header button { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); padding: 4px 12px; cursor: pointer; font-size: 12px; }
     .queue-list { overflow-y: auto; height: calc(100vh - 56px); }
     .queue-item { display: grid; grid-template-columns: 32px 1fr auto auto; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
-    .queue-item.current { background: var(--surface2); }
+    .queue-item.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+    .queue-item.current .pos { color: var(--accent); }
     .queue-item .pos { color: var(--text-muted); font-size: 12px; text-align: center; }
     .queue-item .info { min-width: 0; }
     .queue-item .title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
@@ -87,7 +88,7 @@ export function renderQueueList(sessionId: string): string {
       )
       .get(item.track_id) as QueueTrack | null;
     return track
-      ? { ...track, position: item.position }
+      ? { ...track, track_id: track.id, position: item.position }
       : { track_id: item.track_id, position: item.position, title: "Unknown", artist_name: "Unknown", duration_ms: 0 };
   });
 
