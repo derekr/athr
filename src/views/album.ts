@@ -56,7 +56,7 @@ export function renderAlbum(sessionId: string, albumId: string): string {
   return /* html */ `
     <div class="view-header">
       <div style="display: flex; align-items: flex-start; gap: 24px; margin-bottom: 24px;">
-        <div style="width: 120px; height: 120px; background: var(--surface2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 48px; flex-shrink: 0;">💿</div>
+        <img src="/cover/${albumId}" alt="${escHtml(album.title)}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--surface2);" />
         <div>
           <h1>${escHtml(album.title)}</h1>
           <div style="margin-top: 4px;">

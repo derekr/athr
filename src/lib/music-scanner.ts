@@ -10,6 +10,8 @@ import {
 
 const SUPPORTED_FORMATS = [".mp3", ".flac", ".ogg", ".m4a", ".wav", ".aac", ".opus"];
 
+const COVER_CACHE_DIR = path.join(process.cwd(), ".cache", "covers");
+
 /** Generate a deterministic ID from a string value */
 function deterministicId(prefix: string, value: string): string {
   const hash = createHash("sha256").update(value).digest("hex").slice(0, 12);
@@ -51,6 +53,34 @@ function findCoverInDir(dir: string): string | undefined {
     if (fs.existsSync(p)) return p;
   }
   return undefined;
+}
+
+/** Extract embedded cover art and cache to disk. Returns cached file path or undefined. */
+function cacheEmbeddedCover(
+  albumId: string,
+  pictures: Array<{ format: string; data: Uint8Array }> | undefined
+): string | undefined {
+  if (!pictures || pictures.length === 0) return undefined;
+
+  const pic = pictures[0];
+  const extMap: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+  };
+  const ext = extMap[pic.format] ?? ".jpg";
+  const cachePath = path.join(COVER_CACHE_DIR, `${albumId}${ext}`);
+
+  // Skip if already cached
+  if (fs.existsSync(cachePath)) return cachePath;
+
+  if (!fs.existsSync(COVER_CACHE_DIR)) {
+    fs.mkdirSync(COVER_CACHE_DIR, { recursive: true });
+  }
+
+  fs.writeFileSync(cachePath, pic.data);
+  return cachePath;
 }
 
 /** Scan a music directory and upsert metadata into the catalogue */
@@ -95,11 +125,12 @@ export async function scanMusicDirectory(
         result.artists++;
       }
 
-      // Find cover art
-      const coverPath = findCoverInDir(path.dirname(filePath));
-
-      // Upsert album
+      // Upsert album (with cover art: embedded > directory > none)
       if (!seenAlbums.has(albumId)) {
+        const coverPath =
+          cacheEmbeddedCover(albumId, common.picture as Array<{ format: string; data: Uint8Array }> | undefined) ??
+          findCoverInDir(path.dirname(filePath));
+
         upsertAlbum(db, {
           id: albumId,
           title: albumName,

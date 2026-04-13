@@ -69,7 +69,7 @@ export function renderLibrary(sessionId: string): string {
             (album) => /* html */ `
           <div class="grid-card"
                data-on:click__prevent="@post('/s/${sessionId}/view/album/${album.id}')">
-            <div class="cover">💿</div>
+            <img class="cover" src="/cover/${album.id}" alt="${escHtml(album.title)}" loading="lazy" />
             <div class="card-info">
               <div class="card-title">${escHtml(album.title)}</div>
               <div class="card-subtitle">${escHtml(album.artist_name)}${album.year ? ` · ${album.year}` : ""}</div>

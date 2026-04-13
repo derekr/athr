@@ -341,10 +341,16 @@ export function renderShell(sessionId: string, session: SessionRow): string {
       width: 100%;
       aspect-ratio: 1;
       background: var(--surface2);
+      object-fit: cover;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 48px;
+    }
+
+    .grid-card img.cover {
+      display: block;
+      font-size: inherit;
     }
 
     .grid-card .card-info {
@@ -509,10 +515,13 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           lastMetaTitle = title.textContent || '';
           var artist = document.querySelector('#player-chrome .track-artist');
           var parts = (artist ? artist.textContent : '').split(' \u2014 ');
+          var coverImg = document.querySelector('#player-chrome [data-album-id]');
+          var artwork = coverImg ? [{ src: coverImg.src, type: 'image/jpeg' }] : [];
           navigator.mediaSession.metadata = new MediaMetadata({
             title: lastMetaTitle,
             artist: parts[0] || '',
-            album: parts[1] || ''
+            album: parts[1] || '',
+            artwork: artwork
           });
         }
         audio.addEventListener('play', function() {

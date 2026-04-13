@@ -6,3 +6,4 @@ athr
 *.db-wal
 .DS_Store
 tmp/
+.cache/
