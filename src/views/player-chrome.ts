@@ -72,11 +72,13 @@ export function renderPlayerChrome(sessionId: string): string {
         title="Next">⏭</button>
     </div>
 
-    <img src="/cover/${track.album_id}" alt="" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2);" />
+    <img src="/cover/${track.album_id}" alt="${escHtml(album?.title ?? "")}"
+         style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2); cursor: pointer;"
+         data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')" />
 
     <div class="player-track-info">
       <span class="track-title">${escHtml(track.title)}</span>
-      <span class="track-artist">${escHtml(artist?.name ?? "Unknown")} — ${escHtml(album?.title ?? "Unknown")}</span>
+      <span class="track-artist">${escHtml(artist?.name ?? "Unknown")} — <span data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')" style="cursor: pointer; color: var(--accent);">${escHtml(album?.title ?? "Unknown")}</span></span>
     </div>
 
     <div class="player-progress">
