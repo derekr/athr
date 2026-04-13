@@ -38,6 +38,59 @@ Auxiliary views (settings, queue editor, mini player, event stream) open as **po
 - **Multi-window sync**: Queue, mini player, and event stream popups all share the same session via independent SSE connections. Play a track in one window, see it update everywhere.
 - **Browser integration**: Media Session API provides OS-level media controls (play/pause/next/prev/seek) with track metadata and album art.
 
+## Concepts
+
+### The session is the resource
+
+In a traditional web app, each URL represents a different resource -- `/albums/123` is one resource, `/artists/456` is another, and navigating between them is navigating between resources. The browser loads a new document for each.
+
+In athr, there is one resource: the **session** (`/s/:id`). Everything the user sees -- the library grid, an album detail, an artist page, search results -- is a **view of that session**, not a separate resource. The URL changes (`/s/:id/album/alb_123`), but the document doesn't. The server morphs the content area and pushes the URL via `history.pushState`. The `<audio>` element survives because there's no navigation -- just a view change within the same resource.
+
+This is counterintuitive. Developers are trained to think of URLs as resource identifiers -- each path maps to a thing. Here, the URL is a **view coordinate** within a session. It still supports deep linking (a fresh load of `/s/:id/album/alb_123` renders the right view), but at runtime, view changes are state mutations on the session resource, not navigations to new resources.
+
+### Views are state, not routes
+
+When you click "Library" in the nav, the client POSTs a command: `POST /s/:id/view/library`. The server appends a `ViewChanged` event, the SSE stream pushes new HTML into `#content`, and the server pushes the URL. The browser history entry is a byproduct of a state change, not a cause of navigation.
+
+This means:
+- **Browser back/forward** triggers a `popstate` event, which POSTs to the server (`/s/:id/view/resolve`) to re-resolve the URL into a view. The server is still the authority on what to render.
+- **Refreshing the page** hits the wildcard route (`GET /s/:id/*`), which parses the URL, emits a `ViewChanged` event if needed, and renders the shell with the correct view.
+- **Deep linking** works -- someone can open `/s/:id/album/alb_123` directly and land on the album detail.
+
+The benefit: **no state drift**. The server owns what the user sees. There's no client-side router maintaining its own notion of "current page" that can diverge from the server. Every view is rendered from server state, which means every window, every popup, every reconnection after a network drop shows the same thing. The browser does what it does best -- rendering HTML -- and the server does what it does best -- managing state and rendering views.
+
+Every view change is a server round-trip (POST command + SSE response). With the right backend (fast runtime, local SQLite, server on the same machine as the browser), this is imperceptible. For cases where it might be perceptible, CSS transitions and animations can mask the latency while the server responds -- the user sees motion, not a blank frame. The simplicity you gain -- no client-side routing, no state management library, no hydration, no cache invalidation -- far outweighs the cost of a round-trip that in practice takes single-digit milliseconds locally and can be masked over a network.
+
+### Search as a sub-resource
+
+Most web apps encode search state in query parameters: `/search?q=foo&genre=rock&page=2`. Each combination of params is a URL, but there's no persistent server-side object representing the search.
+
+athr treats search differently, inspired by e-commerce session patterns. When you type a query, the client POSTs `POST /s/:id/searches?q=foo`, which creates a **search resource** (`search:srch_xyz`) with its own event stream. The search holds the query, filters, pagination, and a cached result set. Refining the search (`POST /s/:id/searches/:searchId?q=bar`) appends a `SearchRefined` event to that resource.
+
+This means:
+- **Navigating away and back** loads instantly from the cached search -- no re-query.
+- **Each search has its own URL** (`/s/:id/search/srch_xyz`) and its own event history.
+- **The server controls the search lifecycle**, not the URL bar. The client never parses query params.
+
+This is more server state than the query-param approach, but it's state in the right place -- on the server, in SQLite, queryable and observable. For a local app this is free. For a high-traffic web app you'd add TTLs on abandoned sessions, but the model itself scales -- it's how e-commerce platforms handle complex search with facets, saved filters, and personalization.
+
+### Commands and queries are separate concerns
+
+The CQRS pattern in athr isn't just an architectural choice -- it's how hypermedia naturally works:
+
+- **Commands** (POST) express user intent: "play this track", "navigate to this album", "search for this". They're short-lived, fire-and-forget, and return 204 (no body). The client doesn't render from the response.
+- **Queries** (GET/SSE) deliver representations: the server pushes HTML patches whenever state changes. The client doesn't request specific data -- it subscribes and receives.
+
+This separation means any window can send commands and all windows receive the resulting state change. The queue popup can POST "remove track" and the main window sees the queue update via SSE -- no coordination needed between windows. There's no shared client-side state to synchronize because there is no client-side state.
+
+### Popup windows as a UX pattern
+
+Settings, queue editor, mini player, and event stream open as `window.open()` popups -- real HTML pages with their own SSE connections to the same session. This demonstrates a UX pattern people don't typically reach for on the web: auxiliary features in separate windows that don't disrupt the main experience.
+
+The main window owns audio playback. Opening the queue editor or settings doesn't interrupt the music -- it's a separate document that commands the same session. This mirrors native desktop apps where Cmd+, opens a preferences window and the media player keeps playing.
+
+These features could also be implemented as modals or in-page panels morphed via SSE -- settings is just a sub-resource of the session, queue is just a view of the queue projection. The popup approach was chosen to demonstrate that the hypermedia model supports multiple independent documents sharing one server-side resource, each with its own SSE stream delivering only the patches relevant to that window.
+
 ## Stack
 
 | Layer | Technology |
