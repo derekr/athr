@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import { db, appendEvents, eventStore } from "../app";
 import { newSessionId } from "../lib/ids";
 import { getSessionProjection } from "../projections/session";
@@ -6,8 +7,14 @@ import { renderShell } from "../views/shell";
 
 const router = new Hono();
 
-/** GET / — Create a new session and redirect to it */
+/** GET / — Resume existing session from cookie or create a new one */
 router.get("/", (c) => {
+  // Check for existing session cookie
+  const existingId = getCookie(c, "athr_session");
+  if (existingId && getSessionProjection(db, existingId)) {
+    return c.redirect(`/s/${existingId}`);
+  }
+
   const sessionId = newSessionId();
   const correlationId = c.get("correlationId");
 
@@ -17,6 +24,12 @@ router.get("/", (c) => {
     -1,
     correlationId
   );
+
+  setCookie(c, "athr_session", sessionId, {
+    path: "/",
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 365, // 1 year
+  });
 
   return c.redirect(`/s/${sessionId}`);
 });
@@ -30,6 +43,13 @@ router.get("/s/:id", (c) => {
   if (!session) {
     return c.redirect("/");
   }
+
+  // Keep cookie in sync with the active session
+  setCookie(c, "athr_session", sessionId, {
+    path: "/",
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 365,
+  });
 
   const html = renderShell(sessionId, session);
   return c.html(html);
