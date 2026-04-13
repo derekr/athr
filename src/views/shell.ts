@@ -510,7 +510,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
         audio.addEventListener('timeupdate', function() {
           if (audio.paused) return;
           var now = Date.now();
-          if (now - lastSync < 1000) return;
+          if (now - lastSync < 500) return;
           if (isNaN(audio.currentTime)) return;
           lastSync = now;
           var trackPath = audio.src.split('/').pop() || '';
