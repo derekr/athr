@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db, appendEvents, eventStore } from "../app";
+import { db, appendEvents, eventStore, eventBus } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { getPlaybackProjection } from "../projections/playback";
 import { getQueue } from "../projections/queue";
@@ -235,7 +235,7 @@ router.post("/s/:id/playback/prev", (c) => {
   return c.body(null, 204);
 });
 
-/** POST /s/:id/playback/sync/:positionMs — Client reports current position (no audio seek) */
+/** POST /s/:id/playback/sync/:positionMs — Client reports current position */
 router.post("/s/:id/playback/sync/:positionMs", (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
@@ -246,21 +246,34 @@ router.post("/s/:id/playback/sync/:positionMs", (c) => {
   const positionMs = parseInt(c.req.param("positionMs"), 10);
   if (isNaN(positionMs)) return c.body(null, 204);
 
-  const events: { type: string; data: Record<string, unknown> }[] = [];
-
-  // If server thinks paused but client is syncing position, client is actually playing
+  // If server thinks paused but client is syncing, client is actually playing
   if (!playback.is_playing) {
-    events.push({ type: "PlaybackResumed", data: { positionMs } });
+    appendEvents(
+      `session:${sessionId}`,
+      [{ type: "PlaybackResumed", data: { positionMs } }],
+      getSessionVersion(sessionId),
+      c.get("correlationId")
+    );
   }
 
-  events.push({ type: "PlaybackPositionSynced", data: { positionMs } });
-
-  appendEvents(
-    `session:${sessionId}`,
-    events,
-    getSessionVersion(sessionId),
-    c.get("correlationId")
+  // Update projection directly — position sync is telemetry, not a domain event
+  db.run(
+    `UPDATE playback_projections SET position_ms = ?, updated_at = datetime('now') WHERE session_id = ?`,
+    [positionMs, sessionId]
   );
+
+  // Notify SSE subscribers so mini player updates (without storing an event)
+  eventBus.publish({
+    id: 0,
+    streamId: `session:${sessionId}`,
+    streamVersion: 0,
+    eventType: "PlaybackPositionSynced",
+    data: { positionMs },
+    schemaVersion: 1,
+    correlationId: null,
+    createdAt: new Date().toISOString(),
+  });
+
   return c.body(null, 204);
 });
 

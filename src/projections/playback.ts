@@ -74,8 +74,7 @@ export const playbackProjection: Projection = {
         );
         break;
       }
-      case "PlaybackSeeked":
-      case "PlaybackPositionSynced": {
+      case "PlaybackSeeked": {
         const data = event.data as { positionMs: number };
         db.run(
           `UPDATE playback_projections SET position_ms = ?, updated_at = datetime('now')
