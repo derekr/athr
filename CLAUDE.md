@@ -158,6 +158,21 @@ The server cannot touch `<audio>` directly. It pushes Datastar signals; a `data-
 
 Signals prefixed with `_` are local-only (never sent back to the server). The server pushes them via `datastar-patch-signals` SSE events.
 
+### CQRS
+
+Commands (writes) and queries (reads) are strictly separated — they use different HTTP methods, different lifetimes, and different code paths:
+
+| | Commands | Queries |
+|---|---|---|
+| HTTP | `POST` | `GET` (SSE) |
+| Lifetime | Short-lived, returns immediately | Long-lived, streams indefinitely |
+| Purpose | Mutate state via event store | Push HTML patches to client |
+| Example | `POST /s/:id/play` | `GET /s/:id/sse` |
+
+This separation is what makes concurrent playback across multiple windows work: any window can POST a command; all windows receive the resulting state change via their own SSE query stream.
+
+**Never mix** — a command endpoint must not stream long-lived SSE, and a query stream must not append events.
+
 ### Command → Event → Projection → SSE Pipeline
 
 ```
