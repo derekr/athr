@@ -39,7 +39,7 @@ router.get("/s/:id/events/sse", (c) => {
         runCount = 1;
         runId++;
         const html = renderEventItem(event, runId);
-        void s.write(patchElements(html, "#event-feed", "append"));
+        void s.write(patchElements(html, "#event-list", "append"));
       }
       void s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
     } catch {
@@ -71,7 +71,7 @@ router.get("/s/:id/events/sse", (c) => {
       }
 
       eventCount = recentEvents.length;
-      await s.write(patchElements(groupedHtml.join(""), "#event-feed", "inner"));
+      await s.write(patchElements(`<div id="event-list">${groupedHtml.join("")}</div>`, "#event-feed", "inner"));
       await s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
     },
     onEvent(event, s) {
