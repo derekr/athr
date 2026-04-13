@@ -63,6 +63,3 @@ export class EventBus {
     }
   }
 }
-
-/** Singleton event bus instance for the application */
-export const eventBus = new EventBus();

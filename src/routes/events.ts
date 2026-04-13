@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { stream } from "hono/streaming";
-import { db, eventStore, eventBus } from "../app";
+import { db, eventStore } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderEventsPage, renderEventItem, renderRunBadge } from "../views/events-popup";
 import type { BusEvent } from "../events/bus";
 import { patchElements } from "../lib/sse";
+import { createSSEStream } from "../lib/sse-stream";
 
 const router = new Hono();
 
@@ -20,89 +20,68 @@ router.get("/s/:id/events", (c) => {
 router.get("/s/:id/events/sse", (c) => {
   const sessionId = c.req.param("id");
 
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
-  c.header("X-Accel-Buffering", "no");
+  // Run grouping state
+  let eventCount = 0;
+  let lastEventType = "";
+  let runCount = 0;
+  let runId = 0;
 
-  return stream(c, async (s) => {
-    const session = getSessionProjection(db, sessionId);
-    if (!session) { await s.close(); return; }
+  function handleEvent(event: BusEvent, s: { write(data: string): Promise<unknown> }) {
+    eventCount++;
 
-    // Send recent events as initial state, grouped by consecutive type
-    const recentEvents = eventStore.getStream(`session:${sessionId}`).slice(-50);
-    let initRunId = 0;
-    let initLastType = "";
-    let initRunCount = 0;
-    const groupedHtml: string[] = [];
-
-    for (const event of recentEvents) {
-      if (event.eventType === initLastType) {
-        initRunCount++;
-        groupedHtml[groupedHtml.length - 1] = renderRunBadge(initRunId, initRunCount, event);
+    try {
+      if (event.eventType === lastEventType) {
+        runCount++;
+        const badge = renderRunBadge(runId, runCount, event);
+        void s.write(patchElements(badge, `#run-${runId}`, "outer"));
       } else {
-        initLastType = event.eventType;
-        initRunCount = 1;
-        initRunId++;
-        groupedHtml.push(renderEventItem(event, initRunId));
+        lastEventType = event.eventType;
+        runCount = 1;
+        runId++;
+        const html = renderEventItem(event, runId);
+        void s.write(patchElements(html, "#event-feed", "append"));
       }
+      void s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
+    } catch {
+      // Stream closed
     }
+  }
 
-    await s.write(patchElements(groupedHtml.join(""), "#event-feed", "inner"));
-    await s.write(patchElements(`<span>${recentEvents.length} events</span>`, "#event-count", "inner"));
+  return createSSEStream(c, {
+    sessionId,
+    streamId: `session:${sessionId}`,
+    async onInit(s) {
+      const session = getSessionProjection(db, sessionId);
+      if (!session) return;
 
-    let eventCount = recentEvents.length;
-    let closed = false;
-    let lastEventType = initLastType;
-    let runCount = initRunCount;
-    let runId = initRunId;
+      // Group last 50 events by consecutive type
+      const recentEvents = eventStore.getStream(`session:${sessionId}`).slice(-50);
+      const groupedHtml: string[] = [];
 
-    function handleEvent(event: BusEvent) {
-      if (closed) return;
-      eventCount++;
-
-      try {
+      for (const event of recentEvents) {
         if (event.eventType === lastEventType) {
           runCount++;
-          const badge = renderRunBadge(runId, runCount, event);
-          void s.write(patchElements(badge, `#run-${runId}`, "outer"));
+          groupedHtml[groupedHtml.length - 1] = renderRunBadge(runId, runCount, event);
         } else {
           lastEventType = event.eventType;
           runCount = 1;
           runId++;
-          const html = renderEventItem(event, runId);
-          void s.write(patchElements(html, "#event-feed", "append"));
+          groupedHtml.push(renderEventItem(event, runId));
         }
-        void s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
-      } catch {
-        closed = true;
       }
-    }
 
-    // Subscribe to new events on this session's stream
-    const unsub = eventBus.subscribeStream(
-      `session:${sessionId}`,
-      handleEvent
-    );
-
-    // Also subscribe to search stream events (they're on separate streams)
-    const unsubGlobal = eventBus.subscribe((event: BusEvent) => {
-      if (event.streamId.startsWith("search:")) handleEvent(event);
-    });
-
-    const heartbeat = setInterval(() => {
-      if (closed) return;
-      void s.write(": heartbeat\n\n");
-    }, 15_000);
-
-    await new Promise<void>((resolve) => {
-      c.req.raw.signal.addEventListener("abort", () => resolve());
-    });
-
-    closed = true;
-    clearInterval(heartbeat);
-    unsub();
-    unsubGlobal();
+      eventCount = recentEvents.length;
+      await s.write(patchElements(groupedHtml.join(""), "#event-feed", "inner"));
+      await s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
+    },
+    onEvent(event, s) {
+      handleEvent(event, s);
+    },
+    onGlobalEvent(event, s) {
+      if (event.streamId.startsWith("search:")) {
+        handleEvent(event, s);
+      }
+    },
   });
 });
 
