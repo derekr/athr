@@ -476,7 +476,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           var elDur = document.getElementById('time-dur');
           if (elDur) elDur.textContent = fmt(audio.duration || 0);
         });
-        // Sync position to server every 2s so other windows stay in sync
+        // Sync position to server every 1s so other windows stay in sync
         var lastSync = 0;
         audio.addEventListener('timeupdate', function() {
           var now = Date.now();
@@ -485,6 +485,42 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           lastSync = now;
           fetch('/s/${sessionId}/playback/sync/' + Math.floor(audio.currentTime * 1000), { method: 'POST', keepalive: true });
         });
+
+        // Media Session API — browser/OS media controls
+        var sid = '${sessionId}';
+        function postAction(path) { fetch(path, { method: 'POST', keepalive: true }); }
+
+        navigator.mediaSession.setActionHandler('play', function() { postAction('/s/' + sid + '/playback/resume'); });
+        navigator.mediaSession.setActionHandler('pause', function() { postAction('/s/' + sid + '/playback/pause'); });
+        navigator.mediaSession.setActionHandler('nexttrack', function() { postAction('/s/' + sid + '/playback/next'); });
+        navigator.mediaSession.setActionHandler('previoustrack', function() { postAction('/s/' + sid + '/playback/prev'); });
+        navigator.mediaSession.setActionHandler('seekto', function(details) {
+          if (details.seekTime != null) {
+            audio.currentTime = details.seekTime;
+            postAction('/s/' + sid + '/playback/seek/' + Math.floor(details.seekTime * 1000));
+          }
+        });
+
+        // Media Session metadata — update from player chrome DOM
+        var lastMetaTitle = '';
+        function updateMediaMetadata() {
+          var title = document.querySelector('#player-chrome .track-title');
+          if (!title || title.textContent === lastMetaTitle) return;
+          lastMetaTitle = title.textContent || '';
+          var artist = document.querySelector('#player-chrome .track-artist');
+          var parts = (artist ? artist.textContent : '').split(' \u2014 ');
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: lastMetaTitle,
+            artist: parts[0] || '',
+            album: parts[1] || ''
+          });
+        }
+        audio.addEventListener('play', function() {
+          navigator.mediaSession.playbackState = 'playing';
+          updateMediaMetadata();
+        });
+        audio.addEventListener('pause', function() { navigator.mediaSession.playbackState = 'paused'; });
+        audio.addEventListener('loadedmetadata', updateMediaMetadata);
       })();
     </script>
 
