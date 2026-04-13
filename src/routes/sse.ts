@@ -7,7 +7,7 @@ import { renderPlayerChrome } from "../views/player-chrome";
 import { renderQueueList } from "../views/queue-popup";
 import { renderMiniChrome } from "../views/mini-player";
 import { getPlaybackProjection } from "../projections/playback";
-import type { StoredEvent } from "../events/store";
+import type { BusEvent } from "../events/bus";
 
 const router = new Hono();
 
@@ -75,7 +75,7 @@ router.get("/s/:id/sse", (c) => {
     // Subscribe to session events via EventBus
     const unsub = eventBus.subscribeStream(
       `session:${sessionId}`,
-      (event: StoredEvent) => {
+      (event: BusEvent) => {
         if (closed) return;
         console.log(`[sse] event received: ${event.eventType} for ${sessionId}`);
         void handleEvent(event, s, sessionId);
@@ -105,7 +105,7 @@ interface Writer {
 }
 
 async function handleEvent(
-  event: StoredEvent,
+  event: BusEvent,
   s: Writer,
   sessionId: string
 ): Promise<void> {
@@ -222,7 +222,7 @@ router.get("/s/:id/queue/sse", (c) => {
 
     const unsub = eventBus.subscribeStream(
       `session:${sessionId}`,
-      (event: StoredEvent) => {
+      (event: BusEvent) => {
         if (closed) return;
         const queueEvents = [
           "TrackQueued", "TrackDequeued", "QueueReordered", "QueueCleared", "PlaybackStarted"

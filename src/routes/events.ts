@@ -3,7 +3,7 @@ import { stream } from "hono/streaming";
 import { db, eventStore, eventBus } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderEventsPage, renderEventItem, renderRunBadge } from "../views/events-popup";
-import type { StoredEvent } from "../events/store";
+import type { BusEvent } from "../events/bus";
 
 const router = new Hono();
 
@@ -71,25 +71,26 @@ router.get("/s/:id/events/sse", (c) => {
     let runCount = initRunCount;
     let runId = initRunId;
 
-    function handleEvent(event: StoredEvent) {
+    function handleEvent(event: BusEvent) {
       if (closed) return;
       eventCount++;
 
-      if (event.eventType === lastEventType) {
-        // Same type as last — update the run counter
-        runCount++;
-        const badge = renderRunBadge(runId, runCount, event);
-        void s.write(patchElements(badge, `#run-${runId}`, "outer"));
-      } else {
-        // New event type — append a fresh row
-        lastEventType = event.eventType;
-        runCount = 1;
-        runId++;
-        const html = renderEventItem(event, runId);
-        void s.write(patchElements(html, "#event-feed", "append"));
+      try {
+        if (event.eventType === lastEventType) {
+          runCount++;
+          const badge = renderRunBadge(runId, runCount, event);
+          void s.write(patchElements(badge, `#run-${runId}`, "outer"));
+        } else {
+          lastEventType = event.eventType;
+          runCount = 1;
+          runId++;
+          const html = renderEventItem(event, runId);
+          void s.write(patchElements(html, "#event-feed", "append"));
+        }
+        void s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
+      } catch {
+        closed = true;
       }
-
-      void s.write(patchElements(`<span>${eventCount} events</span>`, "#event-count", "inner"));
     }
 
     // Subscribe to new events on this session's stream
@@ -99,7 +100,7 @@ router.get("/s/:id/events/sse", (c) => {
     );
 
     // Also subscribe to search stream events (they're on separate streams)
-    const unsubGlobal = eventBus.subscribe((event: StoredEvent) => {
+    const unsubGlobal = eventBus.subscribe((event: BusEvent) => {
       if (event.streamId.startsWith("search:")) handleEvent(event);
     });
 

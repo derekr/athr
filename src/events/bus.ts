@@ -1,6 +1,21 @@
 import type { StoredEvent } from "./store";
 
-export type Listener = (event: StoredEvent) => void;
+/** A synthetic event published to the bus without being stored in the event log. */
+export interface SyntheticEvent {
+  id: 0;
+  streamId: string;
+  streamVersion: 0;
+  eventType: string;
+  data: Record<string, unknown>;
+  schemaVersion: number;
+  correlationId: string | null;
+  createdAt: string;
+}
+
+/** Events that flow through the bus — either stored domain events or synthetic notifications. */
+export type BusEvent = StoredEvent | SyntheticEvent;
+
+export type Listener = (event: BusEvent) => void;
 
 export class EventBus {
   private globalListeners: Set<Listener> = new Set();
@@ -33,7 +48,7 @@ export class EventBus {
   }
 
   /** Publish an event to all matching listeners. */
-  publish(event: StoredEvent): void {
+  publish(event: BusEvent): void {
     // Notify global listeners
     for (const listener of this.globalListeners) {
       listener(event);
