@@ -446,6 +446,10 @@ export function renderShell(sessionId: string, session: SessionRow): string {
       data-on:click="window.open('/s/${sessionId}/mini', 'mini', 'width=320,height=120,toolbar=no,menubar=no')">
       Mini
     </button>
+    <button
+      data-on:click="window.open('/s/${sessionId}/events', 'events', 'width=500,height=700')">
+      Events
+    </button>
   </nav>
 
   <main id="content">

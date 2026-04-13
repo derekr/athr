@@ -66,6 +66,7 @@ export function renderQueuePage(sessionId: string): string {
   <div id="queue-list">
     ${renderQueueList(sessionId)}
   </div>
+
 </body>
 </html>`;
 }

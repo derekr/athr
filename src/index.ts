@@ -13,6 +13,7 @@ import playbackRouter from "./routes/playback";
 import queueRouter from "./routes/queue";
 import searchRouter from "./routes/search";
 import settingsRouter from "./routes/settings";
+import eventsRouter from "./routes/events";
 import miniRouter from "./routes/mini";
 
 initLogger({
@@ -47,6 +48,7 @@ app.route("/", playbackRouter);
 app.route("/", queueRouter);
 app.route("/", searchRouter);
 app.route("/", settingsRouter);
+app.route("/", eventsRouter);
 app.route("/", miniRouter);
 app.route("/", sessionRouter);
 

@@ -56,6 +56,7 @@ export function renderMiniPlayerPage(sessionId: string): string {
   <div id="mini-chrome">
     ${renderMiniChrome(sessionId)}
   </div>
+
 </body>
 </html>`;
 }
