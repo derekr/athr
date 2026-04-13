@@ -12,9 +12,16 @@ import { patchElements, patchSignals } from "../lib/sse";
 
 const router = new Hono();
 
-/** GET /s/:id/sse — Main SSE stream for a session */
+/** Detect caller context from Referer header */
+function getSSEContext(referer: string): "main" | "mini" {
+  if (referer.includes("/mini")) return "mini";
+  return "main";
+}
+
+/** GET /s/:id/sse — SSE stream for main window and mini player */
 router.get("/s/:id/sse", (c) => {
   const sessionId = c.req.param("id");
+  const ctx = getSSEContext(c.req.header("Referer") ?? "");
 
   c.header("Content-Type", "text/event-stream");
   c.header("Cache-Control", "no-cache");
@@ -29,24 +36,29 @@ router.get("/s/:id/sse", (c) => {
       return;
     }
 
-    // Send initial state immediately on connect
-    const contentHtml = renderView(sessionId, session);
-    await s.write(patchElements(contentHtml, "#content", "inner"));
+    // Send initial state based on context
+    if (ctx === "main") {
+      const contentHtml = renderView(sessionId, session);
+      await s.write(patchElements(contentHtml, "#content", "inner"));
+      const playerHtml = renderPlayerChrome(sessionId);
+      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+    } else {
+      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+    }
 
-    const playerHtml = renderPlayerChrome(sessionId);
-    await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
-
-    // Push initial audio signals
-    const playback = getPlaybackProjection(db, sessionId);
-    if (playback?.track_id) {
-      await s.write(
-        patchSignals({
-          _trackUrl: `/audio/${playback.track_id}`,
-          _isPlaying: playback.is_playing === 1,
-          _seekTo: playback.position_ms,
-          _volume: playback.volume,
-        })
-      );
+    // Push initial audio signals (main window only)
+    if (ctx === "main") {
+      const playback = getPlaybackProjection(db, sessionId);
+      if (playback?.track_id) {
+        await s.write(
+          patchSignals({
+            _trackUrl: `/audio/${playback.track_id}`,
+            _isPlaying: playback.is_playing === 1,
+            _seekTo: playback.position_ms,
+            _volume: playback.volume,
+          })
+        );
+      }
     }
 
     let closed = false;
@@ -56,7 +68,7 @@ router.get("/s/:id/sse", (c) => {
       `session:${sessionId}`,
       (event: BusEvent) => {
         if (closed) return;
-        void handleEvent(event, s, sessionId);
+        void handleEvent(event, s, sessionId, ctx);
       }
     );
 
@@ -84,10 +96,12 @@ interface Writer {
 async function handleEvent(
   event: BusEvent,
   s: Writer,
-  sessionId: string
+  sessionId: string,
+  ctx: "main" | "mini" = "main"
 ): Promise<void> {
   switch (event.eventType) {
     case "ViewChanged": {
+      if (ctx !== "main") return;
       const session = getSessionProjection(db, sessionId);
       if (!session) return;
       const contentHtml = renderView(sessionId, session);
@@ -95,84 +109,93 @@ async function handleEvent(
       break;
     }
     case "PlaybackStarted": {
-      const playerHtml = renderPlayerChrome(sessionId);
-      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
-      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
-      // Re-render content so now-playing indicator updates
-      const session = getSessionProjection(db, sessionId);
-      if (session) {
-        const contentHtml = renderView(sessionId, session);
-        await s.write(patchElements(contentHtml, "#content", "inner"));
+      if (ctx === "main") {
+        await s.write(patchElements(renderPlayerChrome(sessionId), "#player-chrome", "inner"));
+        const session = getSessionProjection(db, sessionId);
+        if (session) {
+          await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
+        }
+        const data = event.data as { trackId: string; positionMs: number };
+        const trackMeta = db
+          .prepare(
+            `SELECT t.title, t.album_id, ar.name as artist_name, al.title as album_title
+             FROM tracks t
+             JOIN artists ar ON t.artist_id = ar.id
+             JOIN albums al ON t.album_id = al.id
+             WHERE t.id = ?`
+          )
+          .get(data.trackId) as { title: string; album_id: string; artist_name: string; album_title: string } | null;
+        await s.write(
+          patchSignals({
+            _trackUrl: `/audio/${data.trackId}`,
+            _isPlaying: true,
+            _seekTo: data.positionMs ?? 0,
+            _mediaTitle: trackMeta?.title ?? "",
+            _mediaArtist: trackMeta?.artist_name ?? "",
+            _mediaAlbum: trackMeta?.album_title ?? "",
+            _mediaArtwork: trackMeta ? `/cover/${trackMeta.album_id}` : "",
+          })
+        );
+      } else {
+        await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
       }
-      const data = event.data as { trackId: string; positionMs: number };
-      // Look up track metadata for Media Session
-      const trackMeta = db
-        .prepare(
-          `SELECT t.title, t.album_id, ar.name as artist_name, al.title as album_title
-           FROM tracks t
-           JOIN artists ar ON t.artist_id = ar.id
-           JOIN albums al ON t.album_id = al.id
-           WHERE t.id = ?`
-        )
-        .get(data.trackId) as { title: string; album_id: string; artist_name: string; album_title: string } | null;
-      await s.write(
-        patchSignals({
-          _trackUrl: `/audio/${data.trackId}`,
-          _isPlaying: true,
-          _seekTo: data.positionMs ?? 0,
-          _mediaTitle: trackMeta?.title ?? "",
-          _mediaArtist: trackMeta?.artist_name ?? "",
-          _mediaAlbum: trackMeta?.album_title ?? "",
-          _mediaArtwork: trackMeta ? `/cover/${trackMeta.album_id}` : "",
-        })
-      );
       break;
     }
     case "PlaybackPaused": {
-      const playerHtml = renderPlayerChrome(sessionId);
-      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
-      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
-      await s.write(patchSignals({ _isPlaying: false }));
+      if (ctx === "main") {
+        await s.write(patchElements(renderPlayerChrome(sessionId), "#player-chrome", "inner"));
+        await s.write(patchSignals({ _isPlaying: false }));
+      } else {
+        await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      }
       break;
     }
     case "PlaybackResumed": {
-      const playerHtml = renderPlayerChrome(sessionId);
-      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
-      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
-      await s.write(patchSignals({ _isPlaying: true }));
+      if (ctx === "main") {
+        await s.write(patchElements(renderPlayerChrome(sessionId), "#player-chrome", "inner"));
+        await s.write(patchSignals({ _isPlaying: true }));
+      } else {
+        await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      }
       break;
     }
     case "PlaybackSeeked": {
-      const data = event.data as { positionMs: number };
-      await s.write(patchSignals({ _seekTo: data.positionMs }));
-      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      if (ctx === "main") {
+        const data = event.data as { positionMs: number };
+        await s.write(patchSignals({ _seekTo: data.positionMs }));
+      } else {
+        await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      }
       break;
     }
     case "PlaybackPositionSynced": {
-      // Position sync from main window — update mini player only, no _seekTo
-      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      if (ctx === "mini") {
+        await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
+      }
       break;
     }
     case "VolumeChanged": {
-      const data = event.data as { level: number };
-      await s.write(patchSignals({ _volume: data.level }));
-      const playerHtml = renderPlayerChrome(sessionId);
-      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+      if (ctx === "main") {
+        const data = event.data as { level: number };
+        await s.write(patchSignals({ _volume: data.level }));
+        await s.write(patchElements(renderPlayerChrome(sessionId), "#player-chrome", "inner"));
+      }
       break;
     }
     case "TrackQueued":
     case "TrackDequeued":
     case "QueueReordered":
     case "QueueCleared": {
-      const playerHtml = renderPlayerChrome(sessionId);
-      await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+      if (ctx === "main") {
+        await s.write(patchElements(renderPlayerChrome(sessionId), "#player-chrome", "inner"));
+      }
       break;
     }
     case "SettingsUpdated": {
+      if (ctx !== "main") return;
       const session = getSessionProjection(db, sessionId);
       if (!session) return;
-      const contentHtml = renderView(sessionId, session);
-      await s.write(patchElements(contentHtml, "#content", "inner"));
+      await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
       break;
     }
   }
