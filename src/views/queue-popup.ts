@@ -99,9 +99,14 @@ export function renderQueueList(sessionId: string): string {
         </div>
         <div class="duration">${formatDuration(track.duration_ms)}</div>
         <div class="actions">
-          <button
-            data-on:click__prevent="@post('/s/${sessionId}/play/${track.track_id}')"
-            title="Play">▶</button>
+          ${track.position === currentQueuePos && playback?.is_playing
+            ? `<button
+                data-on:click__prevent="@post('/s/${sessionId}/playback/pause')"
+                title="Pause">⏸</button>`
+            : `<button
+                data-on:click__prevent="@post('/s/${sessionId}/play/${track.track_id}')"
+                title="Play">▶</button>`
+          }
           <button
             data-on:click__prevent="@post('/s/${sessionId}/queue/remove/${track.track_id}')"
             title="Remove">✕</button>
