@@ -15,8 +15,8 @@ const app = new Hono();
 // Middleware
 app.use("*", correlationMiddleware);
 
-// Routes
-app.route("/", sessionRouter);
+// Routes — sessionRouter must be last: its GET /s/:id/* wildcard
+// must not swallow specific popup/SSE sub-paths.
 app.route("/", sseRouter);
 app.route("/", viewsRouter);
 app.route("/", catalogueRouter);
@@ -25,5 +25,6 @@ app.route("/", queueRouter);
 app.route("/", searchRouter);
 app.route("/", settingsRouter);
 app.route("/", miniRouter);
+app.route("/", sessionRouter);
 
 export default app;
