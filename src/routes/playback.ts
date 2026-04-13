@@ -1,16 +1,12 @@
 import { Hono } from "hono";
-import { db, appendEvents, eventStore, eventBus } from "../app";
+import { db, appendEvents, eventBus } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { getPlaybackProjection } from "../projections/playback";
 import { getQueue } from "../projections/queue";
 import { getTrack } from "../projections/catalogue";
+import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
-
-function getSessionVersion(sessionId: string): number {
-  const events = eventStore.getStream(`session:${sessionId}`);
-  return events.length > 0 ? events[events.length - 1].streamVersion : -1;
-}
 
 /**
  * POST /s/:id/play/:trackId

@@ -2,6 +2,7 @@ import { db } from "../app";
 import { getQueue } from "../projections/queue";
 import { getPlaybackProjection } from "../projections/playback";
 import { formatDuration } from "./player-chrome";
+import { escHtml } from "../lib/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
@@ -12,14 +13,6 @@ interface QueueTrack {
   title: string;
   artist_name: string;
   duration_ms: number;
-}
-
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 export function renderQueuePage(sessionId: string): string {

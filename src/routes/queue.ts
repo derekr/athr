@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { db, appendEvents, eventStore } from "../app";
+import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { getQueue } from "../projections/queue";
 import { getTrack } from "../projections/catalogue";
 import { renderQueuePage } from "../views/queue-popup";
+import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
 
@@ -14,11 +15,6 @@ router.get("/s/:id/queue", (c) => {
   if (!session) return c.redirect("/");
   return c.html(renderQueuePage(sessionId));
 });
-
-function getSessionVersion(sessionId: string): number {
-  const events = eventStore.getStream(`session:${sessionId}`);
-  return events.length > 0 ? events[events.length - 1].streamVersion : -1;
-}
 
 /** POST /s/:id/queue/add/:trackId — Add a track to queue */
 router.post("/s/:id/queue/add/:trackId", (c) => {

@@ -1,15 +1,10 @@
 import { Hono } from "hono";
 import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/serverSentEventGenerator.js";
-import { db, appendEvents, eventStore } from "../app";
+import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
+import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
-
-/** Get the current version of a session stream */
-function getSessionVersion(sessionId: string): number {
-  const events = eventStore.getStream(`session:${sessionId}`);
-  return events.length > 0 ? events[events.length - 1].streamVersion : -1;
-}
 
 /** Append a ViewChanged event for the session */
 function changeView(

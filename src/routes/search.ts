@@ -7,13 +7,9 @@ import {
 } from "../projections/search";
 import { newSearchId } from "../lib/ids";
 import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/serverSentEventGenerator.js";
+import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
-
-function getSessionVersion(sessionId: string): number {
-  const events = eventStore.getStream(`session:${sessionId}`);
-  return events.length > 0 ? events[events.length - 1].streamVersion : -1;
-}
 
 function getSearchVersion(searchId: string): number {
   const events = eventStore.getStream(`search:${searchId}`);

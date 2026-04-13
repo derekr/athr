@@ -1,17 +1,13 @@
 import { Hono } from "hono";
 import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/serverSentEventGenerator.js";
-import { db, appendEvents, eventStore } from "../app";
+import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderSettingsPage } from "../views/settings";
 import { updateConfig } from "../lib/config";
 import { scanMusicDirectory } from "../lib/music-scanner";
+import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
-
-function getSessionVersion(sessionId: string): number {
-  const events = eventStore.getStream(`session:${sessionId}`);
-  return events.length > 0 ? events[events.length - 1].streamVersion : -1;
-}
 
 /** GET /s/:id/settings — Settings popup page */
 router.get("/s/:id/settings", (c) => {

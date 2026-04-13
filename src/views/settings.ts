@@ -1,6 +1,7 @@
 import { getSettings } from "../projections/settings";
 import { db } from "../app";
 import { readConfig } from "../lib/config";
+import { escHtml } from "../lib/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
@@ -63,10 +64,3 @@ export function renderSettingsPage(sessionId: string): string {
 </html>`;
 }
 
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

@@ -1,4 +1,5 @@
 import { db } from "../app";
+import { escHtml } from "../lib/html";
 
 interface AlbumRow {
   id: string;
@@ -83,10 +84,4 @@ export function renderLibrary(sessionId: string): string {
   `;
 }
 
-export function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+export { escHtml } from "../lib/html";

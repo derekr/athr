@@ -4,23 +4,9 @@ import { db, eventStore, eventBus } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderEventsPage, renderEventItem, renderRunBadge } from "../views/events-popup";
 import type { BusEvent } from "../events/bus";
+import { patchElements } from "../lib/sse";
 
 const router = new Hono();
-
-function patchElements(
-  html: string,
-  selector: string,
-  mode: "inner" | "outer" | "prepend" | "append" = "inner"
-): string {
-  const lines = [`event: datastar-patch-elements`];
-  lines.push(`data: selector ${selector}`);
-  if (mode !== "outer") lines.push(`data: mode ${mode}`);
-  for (const line of html.split("\n")) {
-    lines.push(`data: elements ${line}`);
-  }
-  lines.push("", "");
-  return lines.join("\n");
-}
 
 /** GET /s/:id/events — Events popup page */
 router.get("/s/:id/events", (c) => {
