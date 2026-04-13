@@ -74,6 +74,16 @@ This means:
 
 This is more server state than the query-param approach, but it's state in the right place -- on the server, in SQLite, queryable and observable. For a local app this is free. For a high-traffic web app you'd add TTLs on abandoned sessions, but the model itself scales -- it's how e-commerce platforms handle complex search with facets, saved filters, and personalization.
 
+### Signals bridge server intent to browser APIs
+
+The server can't call `audio.play()` -- that's a browser API. It can't set `audio.currentTime` or `audio.volume` either. These are imperative operations that only run in the client. But the server is the source of truth for playback state.
+
+Datastar signals (`_trackUrl`, `_isPlaying`, `_seekTo`, `_volume`) solve this. They're not client-side state -- they're a **delivery mechanism**. The server pushes signal values via SSE (`datastar-patch-signals`), and a `data-effect` on the player element translates them into browser API calls. The server says "play track X at position Y"; the signal carries that intent; the effect calls `audio.play()`.
+
+The server doesn't need to know about buffering, codec support, or network conditions -- the browser's media stack handles all of that via standard `GET /audio/:trackId` with Range headers. What the server tracks is **intent**: `is_playing` means "the user wants this to play."
+
+The one place this model gets complicated is autoplay policy. The server can push `_isPlaying: true`, but the browser might refuse `audio.play()` if there's been no user gesture. When that happens, the client flips `$_isPlaying` locally to false so the UI shows a play button. The server still thinks it's playing -- but this self-corrects on the next user action (clicking play sends a real command), and the 1s position sync provides a secondary signal: if the client is syncing position, the server knows audio is actually playing.
+
 ### Commands and queries are separate concerns
 
 The CQRS pattern in athr isn't just an architectural choice -- it's how hypermedia naturally works:
