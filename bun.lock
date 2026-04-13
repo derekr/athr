@@ -4,6 +4,7 @@
   "workspaces": {
     "": {
       "dependencies": {
+        "@starfederation/datastar-sdk": "^1.0.0-RC.3",
         "hono": "^4.12.12",
         "music-metadata": "^11.12.3",
       },
@@ -53,6 +54,8 @@
     "@oxlint/binding-win32-ia32-msvc": ["@oxlint/binding-win32-ia32-msvc@1.59.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-rUPy+JnanpPwV/aJCPnxAD1fW50+XPI0VkWr7f0vEbqcdsS8NpB24Rw6RsS7SdpFv8Dw+8ugCwao5nCFbqOUSg=="],
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.59.0", "", { "os": "win32", "cpu": "x64" }, "sha512-xkE7puteDS/vUyRngLXW0t8WgdWoS/tfxXjhP/P7SMqPDx+hs44SpssO3h3qmTqECYEuXBUPzcAw5257Ka+ofA=="],
+
+    "@starfederation/datastar-sdk": ["@starfederation/datastar-sdk@1.0.0-RC.3", "", {}, "sha512-ORnV4cvhwWk+oHXos54SFVcA/fhRSzJqM0dN3i3aqGRlJ5WrM7lCGkgWNqw4Lj96QnlPu1+63avDfHQ3bTF3Cw=="],
 
     "@tokenizer/inflate": ["@tokenizer/inflate@0.4.1", "", { "dependencies": { "debug": "^4.4.3", "token-types": "^6.1.1" } }, "sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA=="],
 
