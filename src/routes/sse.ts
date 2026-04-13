@@ -5,6 +5,7 @@ import { getSessionProjection } from "../projections/session";
 import { renderView } from "../views/content";
 import { renderPlayerChrome } from "../views/player-chrome";
 import { renderQueueList } from "../views/queue-popup";
+import { renderMiniChrome } from "../views/mini-player";
 import { getPlaybackProjection } from "../projections/playback";
 import type { StoredEvent } from "../events/store";
 
@@ -109,6 +110,7 @@ async function handleEvent(
     case "PlaybackStarted": {
       const playerHtml = renderPlayerChrome(sessionId);
       await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
       const data = event.data as { trackId: string; positionMs: number };
       await s.write(
         patchSignals({
@@ -122,12 +124,14 @@ async function handleEvent(
     case "PlaybackPaused": {
       const playerHtml = renderPlayerChrome(sessionId);
       await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
       await s.write(patchSignals({ _isPlaying: false }));
       break;
     }
     case "PlaybackResumed": {
       const playerHtml = renderPlayerChrome(sessionId);
       await s.write(patchElements(playerHtml, "#player-chrome", "inner"));
+      await s.write(patchElements(renderMiniChrome(sessionId), "#mini-chrome", "inner"));
       await s.write(patchSignals({ _isPlaying: true }));
       break;
     }

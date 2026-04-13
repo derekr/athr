@@ -8,6 +8,7 @@ import playbackRouter from "./routes/playback";
 import queueRouter from "./routes/queue";
 import searchRouter from "./routes/search";
 import settingsRouter from "./routes/settings";
+import miniRouter from "./routes/mini";
 
 const app = new Hono();
 
@@ -23,5 +24,6 @@ app.route("/", playbackRouter);
 app.route("/", queueRouter);
 app.route("/", searchRouter);
 app.route("/", settingsRouter);
+app.route("/", miniRouter);
 
 export default app;
