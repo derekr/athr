@@ -39,8 +39,7 @@ export function renderSearchResults(
           type="text"
           value="${escHtml(search.query)}"
           placeholder="Search tracks, albums, artists..."
-          data-bind:_search-query
-          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches/${searchId}?q=' + encodeURIComponent($_searchQuery))"
+          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches/${searchId}?q=' + encodeURIComponent(el.value))"
         />
       </div>
 
@@ -92,8 +91,7 @@ function renderSearchEmpty(sessionId: string, query: string): string {
           type="text"
           value="${escHtml(query)}"
           placeholder="Search tracks, albums, artists..."
-          data-bind:_search-query
-          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches?q=' + encodeURIComponent($_searchQuery))"
+          data-on:input__debounce.300ms="@post('/s/${sessionId}/searches?q=' + encodeURIComponent(el.value))"
         />
       </div>
       <div class="empty-state">

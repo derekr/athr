@@ -128,11 +128,25 @@ async function handleEvent(
         await s.write(patchElements(contentHtml, "#content", "inner"));
       }
       const data = event.data as { trackId: string; positionMs: number };
+      // Look up track metadata for Media Session
+      const trackMeta = db
+        .prepare(
+          `SELECT t.title, t.album_id, ar.name as artist_name, al.title as album_title
+           FROM tracks t
+           JOIN artists ar ON t.artist_id = ar.id
+           JOIN albums al ON t.album_id = al.id
+           WHERE t.id = ?`
+        )
+        .get(data.trackId) as { title: string; album_id: string; artist_name: string; album_title: string } | null;
       await s.write(
         patchSignals({
           _trackUrl: `/audio/${data.trackId}`,
           _isPlaying: true,
           _seekTo: data.positionMs ?? 0,
+          _mediaTitle: trackMeta?.title ?? "",
+          _mediaArtist: trackMeta?.artist_name ?? "",
+          _mediaAlbum: trackMeta?.album_title ?? "",
+          _mediaArtwork: trackMeta ? `/cover/${trackMeta.album_id}` : "",
         })
       );
       break;

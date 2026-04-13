@@ -72,7 +72,7 @@ export function renderPlayerChrome(sessionId: string): string {
         title="Next">⏭</button>
     </div>
 
-    <img src="/cover/${track.album_id}" alt="" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2);" data-album-id="${track.album_id}" />
+    <img src="/cover/${track.album_id}" alt="" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2);" />
 
     <div class="player-track-info">
       <span class="track-title">${escHtml(track.title)}</span>

@@ -18,6 +18,10 @@ const dataEffect = [
   "  audio.currentTime = $_seekTo / 1000;",
   "  $_seekTo = -1;",
   "}",
+  "if ($_mediaTitle && navigator.mediaSession) {",
+  "  var aw = $_mediaArtwork ? [{src: $_mediaArtwork, type: 'image/jpeg'}] : [];",
+  "  navigator.mediaSession.metadata = new MediaMetadata({title: $_mediaTitle, artist: $_mediaArtist, album: $_mediaAlbum, artwork: aw});",
+  "}",
 ].join(" ");
 
 export function renderShell(sessionId: string, session: SessionRow): string {
@@ -453,6 +457,10 @@ export function renderShell(sessionId: string, session: SessionRow): string {
        data-signals:_is-playing="false"
        data-signals:_seek-to="-1"
        data-signals:_volume="1.0"
+       data-signals:_media-title="''"
+       data-signals:_media-artist="''"
+       data-signals:_media-album="''"
+       data-signals:_media-artwork="''"
        data-effect="${dataEffect}"
        data-init="@get('/s/${sessionId}/sse')">
 
@@ -485,6 +493,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
         // Sync position to server every 1s so other windows stay in sync
         var lastSync = 0;
         audio.addEventListener('timeupdate', function() {
+          if (audio.paused) return;
           var now = Date.now();
           if (now - lastSync < 1000) return;
           if (isNaN(audio.currentTime)) return;
@@ -507,29 +516,9 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           }
         });
 
-        // Media Session metadata — update from player chrome DOM
-        var lastMetaTitle = '';
-        function updateMediaMetadata() {
-          var title = document.querySelector('#player-chrome .track-title');
-          if (!title || title.textContent === lastMetaTitle) return;
-          lastMetaTitle = title.textContent || '';
-          var artist = document.querySelector('#player-chrome .track-artist');
-          var parts = (artist ? artist.textContent : '').split(' \u2014 ');
-          var coverImg = document.querySelector('#player-chrome [data-album-id]');
-          var artwork = coverImg ? [{ src: coverImg.src, type: 'image/jpeg' }] : [];
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: lastMetaTitle,
-            artist: parts[0] || '',
-            album: parts[1] || '',
-            artwork: artwork
-          });
-        }
-        audio.addEventListener('play', function() {
-          navigator.mediaSession.playbackState = 'playing';
-          updateMediaMetadata();
-        });
+        // Media Session — driven by server-pushed signals
+        audio.addEventListener('play', function() { navigator.mediaSession.playbackState = 'playing'; });
         audio.addEventListener('pause', function() { navigator.mediaSession.playbackState = 'paused'; });
-        audio.addEventListener('loadedmetadata', updateMediaMetadata);
       })();
     </script>
 
