@@ -4,6 +4,7 @@ import { db, eventBus } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderView } from "../views/content";
 import { renderPlayerChrome } from "../views/player-chrome";
+import { renderQueueList } from "../views/queue-popup";
 import { getPlaybackProjection } from "../projections/playback";
 import type { StoredEvent } from "../events/store";
 
@@ -159,5 +160,45 @@ async function handleEvent(
     }
   }
 }
+
+/** GET /s/:id/queue/sse — Queue popup SSE stream */
+router.get("/s/:id/queue/sse", (c) => {
+  const sessionId = c.req.param("id");
+
+  return stream(c, async (s) => {
+    c.header("Content-Type", "text/event-stream");
+    c.header("Cache-Control", "no-cache");
+    c.header("Connection", "keep-alive");
+    c.header("X-Accel-Buffering", "no");
+
+    const session = getSessionProjection(db, sessionId);
+    if (!session) { await s.close(); return; }
+
+    // Push initial queue state
+    await s.write(patchElements(renderQueueList(sessionId), "#queue-list", "inner"));
+
+    let closed = false;
+
+    const unsub = eventBus.subscribeStream(
+      `session:${sessionId}`,
+      (event: StoredEvent) => {
+        if (closed) return;
+        const queueEvents = [
+          "TrackQueued", "TrackDequeued", "QueueReordered", "QueueCleared", "PlaybackStarted"
+        ];
+        if (queueEvents.includes(event.eventType)) {
+          void s.write(patchElements(renderQueueList(sessionId), "#queue-list", "inner"));
+        }
+      }
+    );
+
+    await new Promise<void>((resolve) => {
+      c.req.raw.signal.addEventListener("abort", () => resolve());
+    });
+
+    closed = true;
+    unsub();
+  });
+});
 
 export default router;

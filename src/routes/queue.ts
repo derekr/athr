@@ -3,8 +3,17 @@ import { db, appendEvents, eventStore } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { getQueue } from "../projections/queue";
 import { getTrack } from "../projections/catalogue";
+import { renderQueuePage } from "../views/queue-popup";
 
 const router = new Hono();
+
+/** GET /s/:id/queue — Queue popup page */
+router.get("/s/:id/queue", (c) => {
+  const sessionId = c.req.param("id");
+  const session = getSessionProjection(db, sessionId);
+  if (!session) return c.redirect("/");
+  return c.html(renderQueuePage(sessionId));
+});
 
 function getSessionVersion(sessionId: string): number {
   const events = eventStore.getStream(`session:${sessionId}`);
