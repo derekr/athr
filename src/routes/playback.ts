@@ -29,45 +29,37 @@ router.post("/s/:id/play/:trackId", (c) => {
   const correlationId = c.get("correlationId");
   let version = getSessionVersion(sessionId);
 
-  if (playback?.track_id === trackId && playback.is_playing === 1) {
+  const queue = getQueue(db, sessionId);
+
+  // If already playing this track with a valid queue position, no-op
+  if (playback?.track_id === trackId && playback.is_playing === 1 && playback.queue_position >= 0) {
     return c.body(null, 204);
   }
 
-  const queue = getQueue(db, sessionId);
-  const existingIdx = queue.findIndex((q) => q.track_id === trackId);
+  // Find or insert the track in the queue
+  let queuePosition: number;
+  const curPos = playback?.queue_position ?? -1;
 
+  // Check if the track is already in queue after the current position
+  const existingIdx = queue.findIndex((q, i) => q.track_id === trackId && i >= curPos);
   if (existingIdx >= 0) {
-    // Track is already in queue — trim everything before it
-    if (existingIdx > 0) {
-      const keepIds = queue.slice(existingIdx).map((q) => q.track_id);
-      const appended = appendEvents(
-        `session:${sessionId}`,
-        [{ type: "QueueReordered", data: { trackIds: keepIds } }],
-        version,
-        correlationId
-      );
-      version = appended[appended.length - 1].streamVersion;
-    }
+    queuePosition = existingIdx;
   } else {
-    // Track not in queue — clear history (everything before current),
-    // then insert this track at position 0
-    const currentIdx = playback?.track_id
-      ? queue.findIndex((q) => q.track_id === playback.track_id)
-      : -1;
-    const keepAfterCurrent = currentIdx >= 0 ? queue.slice(currentIdx + 1).map((q) => q.track_id) : [];
-    const newOrder = [trackId, ...keepAfterCurrent];
+    // Insert right after current position
+    const insertAt = curPos + 1;
     const appended = appendEvents(
       `session:${sessionId}`,
-      [{ type: "QueueReordered", data: { trackIds: newOrder } }],
+      [{ type: "TrackQueued", data: { trackId, position: insertAt } }],
       version,
       correlationId
     );
     version = appended[appended.length - 1].streamVersion;
+    queuePosition = insertAt;
   }
 
   appendEvents(
     `session:${sessionId}`,
-    [{ type: "PlaybackStarted", data: { trackId, positionMs: 0 } }],
+    [{ type: "PlaybackStarted", data: { trackId, positionMs: 0, queuePosition } }],
     version,
     correlationId
   );
@@ -160,15 +152,14 @@ router.post("/s/:id/playback/next", (c) => {
   const correlationId = c.get("correlationId");
   let version = getSessionVersion(sessionId);
 
-  const currentIdx = playback?.track_id
-    ? queue.findIndex((q) => q.track_id === playback.track_id)
-    : -1;
+  const curPos = playback?.queue_position ?? -1;
+  const nextPos = curPos + 1;
 
   let nextTrackId: string | null = null;
+  let nextQueuePos = nextPos;
 
-  if (currentIdx >= 0 && currentIdx + 1 < queue.length) {
-    // There's a next track in the queue
-    nextTrackId = queue[currentIdx + 1].track_id;
+  if (nextPos < queue.length) {
+    nextTrackId = queue[nextPos].track_id;
   } else if (playback?.track_id) {
     // Nothing ahead in queue — auto-enqueue album neighbor
     nextTrackId = getAlbumNeighbor(playback.track_id, "next");
@@ -180,32 +171,23 @@ router.post("/s/:id/playback/next", (c) => {
         correlationId
       );
       version = appended[appended.length - 1].streamVersion;
+      nextQueuePos = queue.length; // position of the newly added track
     }
   }
 
   if (!nextTrackId) {
-    // End of album, nothing in queue — pause
     if (playback?.is_playing) {
       appendEvents(`session:${sessionId}`, [{ type: "PlaybackPaused", data: { positionMs: 0 } }], version, correlationId);
     }
     return c.body(null, 204);
   }
 
-  // Trim history: drop everything before the next track
-  const updatedQueue = getQueue(db, sessionId);
-  const nextIdx = updatedQueue.findIndex((q) => q.track_id === nextTrackId);
-  if (nextIdx > 0) {
-    const keepIds = updatedQueue.slice(nextIdx).map((q) => q.track_id);
-    const appended = appendEvents(
-      `session:${sessionId}`,
-      [{ type: "QueueReordered", data: { trackIds: keepIds } }],
-      version,
-      correlationId
-    );
-    version = appended[appended.length - 1].streamVersion;
-  }
-
-  appendEvents(`session:${sessionId}`, [{ type: "PlaybackStarted", data: { trackId: nextTrackId, positionMs: 0 } }], version, correlationId);
+  appendEvents(
+    `session:${sessionId}`,
+    [{ type: "PlaybackStarted", data: { trackId: nextTrackId, positionMs: 0, queuePosition: nextQueuePos } }],
+    version,
+    correlationId
+  );
   return c.body(null, 204);
 });
 
@@ -219,15 +201,13 @@ router.post("/s/:id/playback/prev", (c) => {
   const correlationId = c.get("correlationId");
   let version = getSessionVersion(sessionId);
 
-  const currentIdx = playback?.track_id
-    ? queue.findIndex((q) => q.track_id === playback.track_id)
-    : -1;
+  const curPos = playback?.queue_position ?? -1;
 
   let prevTrackId: string | null = null;
+  let prevQueuePos = curPos - 1;
 
-  if (currentIdx > 0) {
-    // There's a previous track in the queue
-    prevTrackId = queue[currentIdx - 1].track_id;
+  if (curPos > 0 && curPos - 1 < queue.length) {
+    prevTrackId = queue[curPos - 1].track_id;
   } else if (playback?.track_id) {
     // Nothing behind in queue — auto-enqueue album neighbor at front
     prevTrackId = getAlbumNeighbor(playback.track_id, "prev");
@@ -239,6 +219,8 @@ router.post("/s/:id/playback/prev", (c) => {
         correlationId
       );
       version = appended[appended.length - 1].streamVersion;
+      // Inserting at 0 shifts everything — current is now at curPos + 1
+      prevQueuePos = 0;
     }
   }
 
@@ -246,7 +228,7 @@ router.post("/s/:id/playback/prev", (c) => {
 
   appendEvents(
     `session:${sessionId}`,
-    [{ type: "PlaybackStarted", data: { trackId: prevTrackId, positionMs: 0 } }],
+    [{ type: "PlaybackStarted", data: { trackId: prevTrackId, positionMs: 0, queuePosition: prevQueuePos } }],
     version,
     correlationId
   );

@@ -72,7 +72,7 @@ export function renderQueuePage(sessionId: string): string {
 export function renderQueueList(sessionId: string): string {
   const queue = getQueue(db, sessionId);
   const playback = getPlaybackProjection(db, sessionId);
-  const currentTrackId = playback?.track_id;
+  const currentQueuePos = playback?.queue_position ?? -1;
 
   if (queue.length === 0) {
     return `<div class="empty">Queue is empty</div>`;
@@ -96,7 +96,7 @@ export function renderQueueList(sessionId: string): string {
     ${tracks
       .map(
         (track) => /* html */ `
-      <div class="queue-item ${track.track_id === currentTrackId ? "current" : ""}">
+      <div class="queue-item ${track.position === currentQueuePos ? "current" : ""}">
         <div class="pos">${track.position + 1}</div>
         <div class="info">
           <span class="title">${escHtml(track.title)}</span>

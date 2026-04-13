@@ -5,6 +5,7 @@ import type { Projection } from "../events/projections";
 export interface PlaybackRow {
   session_id: string;
   track_id: string | null;
+  queue_position: number;
   position_ms: number;
   is_playing: number;
   volume: number;
@@ -19,12 +20,19 @@ export const playbackProjection: Projection = {
       CREATE TABLE IF NOT EXISTS playback_projections (
         session_id TEXT PRIMARY KEY,
         track_id TEXT,
+        queue_position INTEGER NOT NULL DEFAULT -1,
         position_ms INTEGER NOT NULL DEFAULT 0,
         is_playing INTEGER NOT NULL DEFAULT 0,
         volume REAL NOT NULL DEFAULT 1.0,
         updated_at TEXT NOT NULL
       )
     `);
+    // Migration: add queue_position if missing
+    try {
+      db.run(`ALTER TABLE playback_projections ADD COLUMN queue_position INTEGER NOT NULL DEFAULT -1`);
+    } catch {
+      // Column already exists
+    }
   },
 
   apply(db: Database, event: StoredEvent): void {
@@ -40,11 +48,11 @@ export const playbackProjection: Projection = {
         break;
       }
       case "PlaybackStarted": {
-        const data = event.data as { trackId: string; positionMs: number };
+        const data = event.data as { trackId: string; positionMs: number; queuePosition?: number };
         db.run(
-          `UPDATE playback_projections SET track_id = ?, position_ms = ?, is_playing = 1, updated_at = datetime('now')
+          `UPDATE playback_projections SET track_id = ?, queue_position = ?, position_ms = ?, is_playing = 1, updated_at = datetime('now')
            WHERE session_id = ?`,
-          [data.trackId, data.positionMs ?? 0, sessionId]
+          [data.trackId, data.queuePosition ?? -1, data.positionMs ?? 0, sessionId]
         );
         break;
       }
