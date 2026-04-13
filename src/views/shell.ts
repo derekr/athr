@@ -502,7 +502,8 @@ export function renderShell(sessionId: string, session: SessionRow): string {
           if (now - lastSync < 1000) return;
           if (isNaN(audio.currentTime)) return;
           lastSync = now;
-          fetch('/s/${sessionId}/playback/sync/' + Math.floor(audio.currentTime * 1000), { method: 'POST', keepalive: true });
+          var trackPath = audio.src.split('/').pop() || '';
+          fetch('/s/${sessionId}/playback/sync/' + trackPath + '/' + Math.floor(audio.currentTime * 1000), { method: 'POST', keepalive: true });
         });
 
         // Media Session API — browser/OS media controls

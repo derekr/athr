@@ -235,13 +235,17 @@ router.post("/s/:id/playback/prev", (c) => {
   return c.body(null, 204);
 });
 
-/** POST /s/:id/playback/sync/:positionMs — Client reports current position */
-router.post("/s/:id/playback/sync/:positionMs", (c) => {
+/** POST /s/:id/playback/sync/:trackId/:positionMs — Client reports current position */
+router.post("/s/:id/playback/sync/:trackId/:positionMs", (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
   const playback = getPlaybackProjection(db, sessionId);
   if (!playback?.track_id) return c.body(null, 204);
+
+  const trackId = c.req.param("trackId");
+  // Reject stale syncs from a previous track
+  if (trackId !== playback.track_id) return c.body(null, 204);
 
   const positionMs = parseInt(c.req.param("positionMs"), 10);
   if (isNaN(positionMs)) return c.body(null, 204);
