@@ -72,13 +72,23 @@ export function renderPlayerChrome(sessionId: string): string {
         title="Next">⏭</button>
     </div>
 
-    <img src="/cover/${track.album_id}" alt="${escHtml(album?.title ?? "")}"
-         style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2); cursor: pointer;"
-         data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')" />
+    <a href="/s/${sessionId}/album/${track.album_id}"
+       data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')">
+      <img src="/cover/${track.album_id}" alt="${escHtml(album?.title ?? "")}"
+           style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2);" />
+    </a>
 
     <div class="player-track-info">
       <span class="track-title">${escHtml(track.title)}</span>
-      <span class="track-artist">${escHtml(artist?.name ?? "Unknown")} — <span data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')" style="cursor: pointer; color: var(--accent);">${escHtml(album?.title ?? "Unknown")}</span></span>
+      <span class="track-artist">
+        <a href="/s/${sessionId}/artist/${track.artist_id}"
+           data-on:click__prevent="@post('/s/${sessionId}/view/artist/${track.artist_id}')"
+           class="player-link">${escHtml(artist?.name ?? "Unknown")}</a>
+        —
+        <a href="/s/${sessionId}/album/${track.album_id}"
+           data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')"
+           class="player-link">${escHtml(album?.title ?? "Unknown")}</a>
+      </span>
     </div>
 
     <div class="player-progress">

@@ -176,6 +176,15 @@ export function renderShell(sessionId: string, session: SessionRow): string {
       text-overflow: ellipsis;
     }
 
+    .player-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .player-link:hover {
+      color: var(--accent);
+    }
+
     .track-artist {
       display: block;
       font-size: 12px;
