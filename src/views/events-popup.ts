@@ -34,6 +34,11 @@ export function renderEventsPage(sessionId: string): string {
     .header .count { font-size: 11px; color: var(--text-muted); }
     #event-feed {
       flex: 1; overflow-y: auto; padding: 0;
+      overflow-anchor: none;
+    }
+    #scroll-anchor {
+      overflow-anchor: auto;
+      height: 1px;
     }
     .event {
       padding: 8px 16px;
@@ -89,6 +94,7 @@ export function renderEventsPage(sessionId: string): string {
     <span class="count" id="event-count"></span>
   </div>
   <div id="event-feed" data-init="@get('/s/${sessionId}/events/sse')">
+    <div id="scroll-anchor"></div>
   </div>
 
 </body>
