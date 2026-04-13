@@ -4,6 +4,7 @@ import sessionRouter from "./routes/session";
 import sseRouter from "./routes/sse";
 import viewsRouter from "./routes/views";
 import catalogueRouter from "./routes/catalogue";
+import playbackRouter from "./routes/playback";
 
 const app = new Hono();
 
@@ -15,5 +16,6 @@ app.route("/", sessionRouter);
 app.route("/", sseRouter);
 app.route("/", viewsRouter);
 app.route("/", catalogueRouter);
+app.route("/", playbackRouter);
 
 export default app;
