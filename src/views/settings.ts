@@ -38,6 +38,8 @@ export function renderSettingsPage(sessionId: string): string {
   </style>
 </head>
 <body>
+  <div data-signals:music-dir="${escHtml(musicDir)}"></div>
+
   <h1>Settings</h1>
 
   <div id="settings-content">
@@ -46,11 +48,11 @@ export function renderSettingsPage(sessionId: string): string {
       <div class="field">
         <label for="music-dir">Music directory</label>
         <input type="text" id="music-dir" value="${escHtml(musicDir)}"
-               data-bind:_music-dir
+               data-bind:musicDir
                placeholder="/path/to/your/Music" />
       </div>
       <button
-        data-on:click__prevent="@post('/s/${sessionId}/settings/update', { key: 'dir', value: $_musicDir })">
+        data-on:click__prevent="@post('/s/${sessionId}/settings/update')">
         Save &amp; Rescan
       </button>
     </div>

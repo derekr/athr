@@ -27,41 +27,38 @@ router.post("/s/:id/settings/update", async (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
-  const body = await c.req
-    .json<{ key: string; value: unknown }>()
-    .catch(() => null);
+  const reader = await ServerSentEventGenerator.readSignals(c.req.raw);
+  if (!reader.success) return c.text(reader.error ?? "Bad signals", 400);
 
-  if (!body?.key) return c.text("key required", 400);
+  const signals = (reader.signals ?? {}) as { musicDir?: string };
+  const musicDir = signals.musicDir?.trim() ?? "";
+
+  if (!musicDir) return c.text("musicDir signal required", 400);
 
   const correlationId = c.get("correlationId");
   const version = getSessionVersion(sessionId);
 
   appendEvents(
     `session:${sessionId}`,
-    [{ type: "SettingsUpdated", data: { key: body.key, value: body.value } }],
+    [{ type: "SettingsUpdated", data: { key: "dir", value: musicDir } }],
     version,
     correlationId
   );
 
-  // Persist to config file
-  updateConfig(body.key, body.value);
+  updateConfig("dir", musicDir);
 
-  // If the music directory changed, trigger a rescan
-  if (body.key === "dir" && typeof body.value === "string") {
-    void scanMusicDirectory(body.value, db).then((result) => {
-      console.log(
-        `Rescan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists`
-      );
-      if (result.errors.length > 0) {
-        console.warn(`Scan errors: ${result.errors.join(", ")}`);
-      }
-    });
-  }
+  void scanMusicDirectory(musicDir, db).then((result) => {
+    console.log(
+      `Rescan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists`
+    );
+    if (result.errors.length > 0) {
+      console.warn(`Scan errors: ${result.errors.join(", ")}`);
+    }
+  });
 
-  return ServerSentEventGenerator.stream((sse) => {
+  return ServerSentEventGenerator.stream(c.req.raw, (sse) => {
     sse.patchElements(
-      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Saved!</div>`,
-      { selector: "#feedback", mode: "outer" }
+      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Saved! Scanning library…</div>`
     );
   });
 });
