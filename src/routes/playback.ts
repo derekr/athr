@@ -259,13 +259,23 @@ router.post("/s/:id/playback/sync/:positionMs", (c) => {
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
   const playback = getPlaybackProjection(db, sessionId);
-  if (!playback?.is_playing) return c.body(null, 204);
+  if (!playback?.track_id) return c.body(null, 204);
 
   const positionMs = parseInt(c.req.param("positionMs"), 10);
+  if (isNaN(positionMs)) return c.body(null, 204);
+
+  const events: { type: string; data: Record<string, unknown> }[] = [];
+
+  // If server thinks paused but client is syncing position, client is actually playing
+  if (!playback.is_playing) {
+    events.push({ type: "PlaybackResumed", data: { positionMs } });
+  }
+
+  events.push({ type: "PlaybackPositionSynced", data: { positionMs } });
 
   appendEvents(
     `session:${sessionId}`,
-    [{ type: "PlaybackPositionSynced", data: { positionMs } }],
+    events,
     getSessionVersion(sessionId),
     c.get("correlationId")
   );
