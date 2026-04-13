@@ -1,12 +1,13 @@
 import { Hono } from "hono";
+import { correlationMiddleware } from "./middleware/correlation";
+import sessionRouter from "./routes/session";
 
 const app = new Hono();
 
-app.get("/", (c) => {
-	return c.text("athr");
-});
+// Middleware
+app.use("*", correlationMiddleware);
 
-export default {
-	port: 3000,
-	fetch: app.fetch,
-};
+// Routes
+app.route("/", sessionRouter);
+
+export default app;
