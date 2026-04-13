@@ -73,8 +73,6 @@ router.get("/s/:id/events/sse", (c) => {
 
     function handleEvent(event: StoredEvent) {
       if (closed) return;
-      // Skip telemetry — not a domain event
-      if (event.eventType === "PlaybackPositionSynced") return;
       eventCount++;
 
       if (event.eventType === lastEventType) {
