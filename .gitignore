@@ -1,4 +1,5 @@
 node_modules/
+.claude/settings.local.json
 athr
 *.db
 *.db-shm
