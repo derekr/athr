@@ -45,6 +45,7 @@ export function renderQueuePage(sessionId: string): string {
     .queue-item { display: grid; grid-template-columns: 32px 1fr auto auto; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
     .queue-item.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
     .queue-item.current .pos { color: var(--accent); }
+    .queue-item.played { opacity: 0.4; }
     .queue-item .pos { color: var(--text-muted); font-size: 12px; text-align: center; }
     .queue-item .info { min-width: 0; }
     .queue-item .title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
@@ -96,7 +97,7 @@ export function renderQueueList(sessionId: string): string {
     ${tracks
       .map(
         (track) => /* html */ `
-      <div class="queue-item ${track.position === currentQueuePos ? "current" : ""}">
+      <div class="queue-item${track.position === currentQueuePos ? " current" : track.position < currentQueuePos ? " played" : ""}">
         <div class="pos">${track.position + 1}</div>
         <div class="info">
           <span class="title">${escHtml(track.title)}</span>
