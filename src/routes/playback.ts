@@ -253,7 +253,7 @@ router.post("/s/:id/playback/prev", (c) => {
   return c.body(null, 204);
 });
 
-/** POST /s/:id/playback/sync/:positionMs */
+/** POST /s/:id/playback/sync/:positionMs — Client reports current position (no audio seek) */
 router.post("/s/:id/playback/sync/:positionMs", (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
@@ -265,7 +265,7 @@ router.post("/s/:id/playback/sync/:positionMs", (c) => {
 
   appendEvents(
     `session:${sessionId}`,
-    [{ type: "PlaybackSeeked", data: { positionMs } }],
+    [{ type: "PlaybackPositionSynced", data: { positionMs } }],
     getSessionVersion(sessionId),
     c.get("correlationId")
   );

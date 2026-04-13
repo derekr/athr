@@ -11,7 +11,7 @@ const dataEffect = [
   "  audio.src = $_trackUrl;",
   "  if ($_seekTo >= 0) audio.currentTime = $_seekTo / 1000;",
   "}",
-  "if ($_isPlaying && audio.paused) audio.play().catch(() => {});",
+  "if ($_isPlaying && audio.paused) audio.play().catch(function() { $_isPlaying = false; });",
   "if (!$_isPlaying && !audio.paused) audio.pause();",
   "audio.volume = $_volume;",
   "if ($_seekTo >= 0 && $_trackUrl && audio.src.endsWith($_trackUrl)) {",
@@ -480,7 +480,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
         var lastSync = 0;
         audio.addEventListener('timeupdate', function() {
           var now = Date.now();
-          if (now - lastSync < 2000) return;
+          if (now - lastSync < 1000) return;
           if (isNaN(audio.currentTime)) return;
           lastSync = now;
           fetch('/s/${sessionId}/playback/sync/' + Math.floor(audio.currentTime * 1000), { method: 'POST', keepalive: true });

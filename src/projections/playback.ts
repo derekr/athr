@@ -66,7 +66,8 @@ export const playbackProjection: Projection = {
         );
         break;
       }
-      case "PlaybackSeeked": {
+      case "PlaybackSeeked":
+      case "PlaybackPositionSynced": {
         const data = event.data as { positionMs: number };
         db.run(
           `UPDATE playback_projections SET position_ms = ?, updated_at = datetime('now')
@@ -105,8 +106,5 @@ export function getPlaybackProjection(
 
 /** Estimate current position in ms, accounting for elapsed time if playing */
 export function estimatePositionMs(playback: PlaybackRow): number {
-  if (!playback.is_playing) return playback.position_ms;
-  const updatedAt = new Date(playback.updated_at + "Z").getTime();
-  const elapsed = Date.now() - updatedAt;
-  return playback.position_ms + Math.max(0, elapsed);
+  return playback.position_ms;
 }
