@@ -1,0 +1,253 @@
+# athr
+
+A local music player that proves you don't need a SPA framework to build rich, interactive media experiences with continuous playback.
+
+**athr** (from _aether_ -- the theoretical medium through which sound propagates) demonstrates that server-driven hypermedia patterns with [Datastar](https://data-star.dev/) morphing, CQRS, and event sourcing can deliver a fluid, app-like experience -- including persistent audio playback across view changes, multi-window sync, and browser media controls.
+
+No client-side routing. No virtual DOM. No framework. The server is the source of truth.
+
+## The Core Insight
+
+Audio playback requires a persistent DOM -- the `<audio>` element is destroyed on full page navigation. Rather than fighting this with iframes or service workers, athr uses a single-document architecture where the server morphs content areas via SSE. The document never navigates. The URL bar updates via `history.pushState` pushed from the server. The audio element lives outside all morph targets.
+
+```
++-------------------------------------------+
+| <nav> Library Search Queue Settings Mini  |
++-------------------------------------------+
+|                                           |
+| <main id="content">                      |
+|   Morphed by SSE -- Library / Album /     |
+|   Artist / Search views swap in here      |
+|                                           |
++-------------------------------------------+
+| <div id="player">                         |
+|   <audio data-ignore-morph />             |
+|   Track info, progress, controls          |
+|   (player chrome morphed, audio isn't)    |
++-------------------------------------------+
+```
+
+Auxiliary views (settings, queue editor, mini player, event stream) open as **popup windows** -- real separate HTML pages with their own SSE connections to the same session. Commands from any window mutate shared state; all windows stay in sync. This mirrors native app patterns where Cmd+, opens a preferences window.
+
+## What This Demonstrates
+
+- **Hypermedia / HATEOAS**: HTML as the engine of application state. The server pushes HTML patches, not JSON for the client to render.
+- **No client-side routing**: The server tells the browser what the URL should be via `executeScript(history.pushState(...))`. Browser back/forward triggers a `popstate` handler that POSTs to the server to resolve the view.
+- **CQRS**: Commands (POST) and queries (GET/SSE) are strictly separated. Commands are short-lived, append events, return 204. Queries are long-lived SSE streams that push HTML patches.
+- **Event sourcing**: All state changes are immutable domain events in an append-only SQLite table. Projections (read models) are rebuildable from the event log.
+- **Multi-window sync**: Queue, mini player, and event stream popups all share the same session via independent SSE connections. Play a track in one window, see it update everywhere.
+- **Browser integration**: Media Session API provides OS-level media controls (play/pause/next/prev/seek) with track metadata and album art.
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Runtime | [Bun](https://bun.sh) |
+| HTTP | [Hono](https://hono.dev) |
+| Reactivity | [Datastar](https://data-star.dev/) v1.0.0-RC.8 (CDN) |
+| Event store | SQLite (`bun:sqlite`) |
+| Projections | SQLite (`bun:sqlite`) |
+| Views | HTML template literals (no JSX, no framework) |
+| Audio metadata | `music-metadata` |
+| Logging | [evlog](https://evlog.dev) (server + client) |
+
+## Quick Start
+
+```bash
+# Install dependencies
+bun install
+
+# Start the dev server (hot reload)
+bun run dev
+
+# Open http://localhost:3000
+# Configure your music directory in Settings
+```
+
+## CLI
+
+```bash
+# Build the self-contained binary
+bun run build
+
+# Serve and scan a music directory
+athr serve --dir ~/Music
+
+# Custom port
+athr serve --dir ~/Music --port 8080
+
+# Print config
+athr config
+
+# Update config
+athr config set dir ~/Music
+
+# Rescan library without starting server
+athr scan
+```
+
+## Architecture
+
+### Data Flow
+
+```
+Client @post --> Command handler --> Event store (append)
+                     |                    |
+                     |            Projection (update)
+                     |                    |
+                     +-- reads       EventBus (publish)
+                        projection        |
+                        to validate   SSE --> client (morph)
+```
+
+### Route Map
+
+#### SSE Streams (long-lived GET)
+
+| Route | Purpose |
+|---|---|
+| `GET /s/:id/sse` | Main stream -- content + player + signal patches |
+| `GET /s/:id/queue/sse` | Queue popup stream |
+| `GET /s/:id/events/sse` | Live event stream viewer |
+
+#### Pages (full HTML, initial load)
+
+| Route | Purpose |
+|---|---|
+| `GET /` | Create/resume session, redirect to `/s/:id` |
+| `GET /s/:id` | Full shell with pre-rendered view |
+| `GET /s/:id/*` | Deep link support (album, artist, search) |
+| `GET /s/:id/queue` | Queue popup page |
+| `GET /s/:id/settings` | Settings popup page |
+| `GET /s/:id/mini` | Mini player popup page |
+| `GET /s/:id/events` | Event stream viewer page |
+
+#### Commands (short-lived POST)
+
+| Route | Purpose |
+|---|---|
+| `POST /s/:id/view/library` | Navigate to library |
+| `POST /s/:id/view/album/:albumId` | Navigate to album |
+| `POST /s/:id/view/artist/:artistId` | Navigate to artist |
+| `POST /s/:id/view/search` | Navigate to search |
+| `POST /s/:id/play/:trackId` | Play a track (adds to queue) |
+| `POST /s/:id/playback/pause` | Pause |
+| `POST /s/:id/playback/resume` | Resume |
+| `POST /s/:id/playback/next` | Next track (queue or album neighbor) |
+| `POST /s/:id/playback/prev` | Previous track |
+| `POST /s/:id/playback/seek/:positionMs` | Seek to position |
+| `POST /s/:id/playback/sync/:trackId/:positionMs` | Position telemetry (not stored) |
+| `POST /s/:id/volume/:level` | Set volume (0.0-1.0) |
+| `POST /s/:id/queue/add/:trackId` | Add track to queue |
+| `POST /s/:id/queue/add-album/:albumId` | Add album to queue |
+| `POST /s/:id/queue/remove/:trackId` | Remove from queue |
+| `POST /s/:id/queue/clear` | Clear queue |
+| `POST /s/:id/searches` | Create search (query via `?q=`) |
+| `POST /s/:id/searches/:searchId` | Refine search |
+| `POST /s/:id/settings/update` | Update settings |
+
+#### Static / Media
+
+| Route | Purpose |
+|---|---|
+| `GET /audio/:trackId` | Stream audio (Range header support) |
+| `GET /cover/:albumId` | Album cover art |
+| `GET /public/*` | Static assets |
+
+### Domain Events
+
+Only user-intent events are stored. Position telemetry (`PlaybackPositionSynced`) updates the projection directly and publishes to the event bus without hitting the event store.
+
+| Event | Stream | Data |
+|---|---|---|
+| `SessionCreated` | `session:{id}` | `{}` |
+| `ViewChanged` | `session:{id}` | `{ view, viewData }` |
+| `PlaybackStarted` | `session:{id}` | `{ trackId, positionMs, queuePosition }` |
+| `PlaybackPaused` | `session:{id}` | `{ positionMs }` |
+| `PlaybackResumed` | `session:{id}` | `{ positionMs }` |
+| `PlaybackSeeked` | `session:{id}` | `{ positionMs }` |
+| `VolumeChanged` | `session:{id}` | `{ level }` |
+| `TrackQueued` | `session:{id}` | `{ trackId, position }` |
+| `TrackDequeued` | `session:{id}` | `{ trackId }` |
+| `QueueReordered` | `session:{id}` | `{ trackIds }` |
+| `QueueCleared` | `session:{id}` | `{}` |
+| `SearchCreated` | `search:{id}` | `{ sessionId, query, filters }` |
+| `SearchRefined` | `search:{id}` | `{ query }` |
+| `SettingsUpdated` | `session:{id}` | `{ key, value }` |
+
+### Session Model
+
+```
+Session /s/:id
++-- Playback    track, position, volume, playing/paused, queue_position
++-- Queue       ordered track list with cursor
++-- View        current view name + view-specific data
++-- Searches    sub-resources with own event streams
+```
+
+Sessions persist across server restarts (SQLite file) and browser restarts (cookie).
+
+## SLOPerations
+
+_Server-Linked Observability for Operations_ -- the benefits of this architecture when working with AI agents.
+
+Because athr treats the server as the single source of truth and exposes all state transitions as events, an AI coding agent has a remarkably complete view of the application's operations:
+
+### Structured Logging (evlog)
+
+Server-side request logging and client-side log transport both write to `.evlog/logs/` as NDJSON. An agent can read these to understand what happened:
+
+```bash
+# Server logs
+{"method":"POST","path":"/s/sess_abc/play/t_123","status":204,"duration":"17ms",...}
+
+# Client logs (transported via /api/_evlog/ingest)
+{"action":"app_init","path":"/s/sess_abc/library","service":"athr-web",...}
+```
+
+### Event Stream Viewer
+
+The Events popup (`/s/:id/events`) shows a live feed of all domain events and bus notifications. Consecutive events of the same type collapse into a counted badge. An agent connected to Chrome DevTools MCP can open this popup and watch events flow in real time.
+
+### Chrome DevTools MCP
+
+With the [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) connected, an agent can:
+
+- **Take screenshots** to verify UI state after interactions
+- **Read the accessibility tree** to find and click elements
+- **Evaluate scripts** to inspect audio state, signal values, DOM content
+- **Run performance traces** and analyze Core Web Vitals
+- **Check console messages** for errors or warnings
+
+### Event Sourcing as Audit Log
+
+Every user action is an immutable event with a correlation ID. An agent can query the event store to trace "what happened?" -- from the user's click through to the resulting state change:
+
+```sql
+SELECT * FROM events WHERE correlation_id = 'cor_abc123' ORDER BY id;
+```
+
+### Why This Matters
+
+Traditional SPAs with client-side state make it hard for an agent to know what actually happened -- state lives in closures, Redux stores, or component instances that aren't easily inspectable. With athr's architecture:
+
+- **Server state is queryable**: `SELECT * FROM playback_projections` tells you exactly what the server thinks is happening
+- **Events are traceable**: every state transition has a cause (correlation ID) and a timestamp
+- **SSE is observable**: the agent can see what patches were pushed to which windows
+- **No hidden client state**: Datastar signals are delivery mechanisms, not independent state. The server pushes them; the client doesn't invent its own.
+
+This makes the development loop with an AI agent significantly tighter -- the agent can diagnose issues from server logs, event streams, and browser state without guessing.
+
+## Development
+
+```bash
+bun run dev          # Dev server with hot reload
+bun test             # Run tests
+bun run typecheck    # Type check
+bun run lint         # Lint (oxlint)
+bun run build        # Build self-contained binary
+```
+
+## License
+
+MIT
