@@ -11,6 +11,7 @@ import { playbackProjection } from "./projections/playback";
 import { queueProjection } from "./projections/queue";
 import { searchProjection } from "./projections/search";
 import { initCatalogue } from "./projections/catalogue";
+import { settingsProjection } from "./projections/settings";
 
 /** Shared SQLite database (single file for both events and projections) */
 export const db = new Database(
@@ -27,6 +28,7 @@ projectionEngine.register(sessionProjection);
 projectionEngine.register(playbackProjection);
 projectionEngine.register(queueProjection);
 projectionEngine.register(searchProjection);
+projectionEngine.register(settingsProjection);
 
 /** Initialize catalogue tables */
 initCatalogue(db);
