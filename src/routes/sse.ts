@@ -64,7 +64,7 @@ router.get("/s/:id/sse", (c) => {
         patchSignals({
           _trackUrl: `/audio/${playback.track_id}`,
           _isPlaying: playback.is_playing === 1,
-          _seekTo: -1,
+          _seekTo: playback.position_ms,
           _volume: playback.volume,
         })
       );
