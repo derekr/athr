@@ -10,6 +10,7 @@ import { sessionProjection } from "./projections/session";
 import { playbackProjection } from "./projections/playback";
 import { queueProjection } from "./projections/queue";
 import { searchProjection } from "./projections/search";
+import { initCatalogue } from "./projections/catalogue";
 
 /** Shared SQLite database (single file for both events and projections) */
 export const db = new Database(
@@ -26,6 +27,9 @@ projectionEngine.register(sessionProjection);
 projectionEngine.register(playbackProjection);
 projectionEngine.register(queueProjection);
 projectionEngine.register(searchProjection);
+
+/** Initialize catalogue tables */
+initCatalogue(db);
 
 /** In-process pub/sub bridge from event store to SSE streams */
 export const eventBus = new EventBus();
