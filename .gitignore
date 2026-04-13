@@ -1,0 +1,7 @@
+node_modules/
+athr
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+tmp/
