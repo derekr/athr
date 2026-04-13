@@ -426,11 +426,13 @@ export function renderShell(sessionId: string, session: SessionRow): string {
     <span class="app-name">athr</span>
     <button
       data-on:click__prevent="@post('/s/${sessionId}/view/library')"
-      class="${session.current_view === "library" ? "active" : ""}">
+      id="nav-library"
+      class="${["library", "album", "artist"].includes(session.current_view) ? "active" : ""}">
       Library
     </button>
     <button
       data-on:click__prevent="@post('/s/${sessionId}/view/search')"
+      id="nav-search"
       class="${session.current_view === "search" ? "active" : ""}">
       Search
     </button>

@@ -22,6 +22,19 @@ async function onViewChanged(s: Writer, sessionId: string): Promise<void> {
   const session = getSessionProjection(db, sessionId);
   if (!session) return;
   await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
+
+  // Update nav active states
+  const v = session.current_view;
+  const libClass = ["library", "album", "artist"].includes(v) ? "active" : "";
+  const searchClass = v === "search" ? "active" : "";
+  await s.write(patchElements(
+    `<button id="nav-library" data-on:click__prevent="@post('/s/${sessionId}/view/library')" class="${libClass}">Library</button>`,
+    "#nav-library", "outer"
+  ));
+  await s.write(patchElements(
+    `<button id="nav-search" data-on:click__prevent="@post('/s/${sessionId}/view/search')" class="${searchClass}">Search</button>`,
+    "#nav-search", "outer"
+  ));
 }
 
 async function onPlaybackStartedMain(s: Writer, sessionId: string, event: BusEvent): Promise<void> {
