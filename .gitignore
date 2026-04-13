@@ -7,3 +7,4 @@ athr
 .DS_Store
 tmp/
 .cache/
+.fallow/
