@@ -28,12 +28,18 @@ export const queueProjection: Projection = {
     switch (event.eventType) {
       case "TrackQueued": {
         const data = event.data as { trackId: string; position: number };
-        // Shift existing items at or after the position
-        db.run(
-          `UPDATE queue_projections SET position = position + 1
-           WHERE session_id = ? AND position >= ?`,
-          [sessionId, data.position]
-        );
+        // Shift existing items at or after the position (update in reverse to avoid UNIQUE conflicts)
+        const toShift = db
+          .prepare(
+            `SELECT position FROM queue_projections WHERE session_id = ? AND position >= ? ORDER BY position DESC`
+          )
+          .all(sessionId, data.position) as { position: number }[];
+        for (const row of toShift) {
+          db.run(
+            `UPDATE queue_projections SET position = ? WHERE session_id = ? AND position = ?`,
+            [row.position + 1, sessionId, row.position]
+          );
+        }
         db.run(
           `INSERT INTO queue_projections (session_id, track_id, position)
            VALUES (?, ?, ?)`,
