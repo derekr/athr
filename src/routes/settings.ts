@@ -4,12 +4,11 @@ import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderSettingsPage } from "../views/settings";
 import { readConfig, updateConfig } from "../lib/config";
-import { scanInWorker, watchMusicDirectory } from "../lib/music-watcher";
+import { runScan, watchMusicDirectory } from "../lib/music-watcher";
 import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
 
-const dbPath = process.env.DATABASE_PATH ?? "athr.db";
 
 /** GET /s/:id/settings — Settings popup page */
 router.get("/s/:id/settings", (c) => {
@@ -46,8 +45,8 @@ router.post("/s/:id/settings/update", async (c) => {
   updateConfig("dir", musicDir);
 
   // Fire-and-forget — progress/completion events will push via SSE
-  void scanInWorker(musicDir, dbPath).then(() => {
-    watchMusicDirectory(musicDir, dbPath);
+  void runScan(musicDir).then(() => {
+    watchMusicDirectory(musicDir);
   });
 
   return ServerSentEventGenerator.stream((sse) => {
@@ -72,7 +71,7 @@ router.post("/s/:id/settings/rescan", (c) => {
     });
   }
 
-  void scanInWorker(musicDir, dbPath);
+  void runScan(musicDir);
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
@@ -96,7 +95,7 @@ router.post("/s/:id/settings/clear-rescan", (c) => {
     });
   }
 
-  void scanInWorker(musicDir, dbPath, true);
+  void runScan(musicDir, true);
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(

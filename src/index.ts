@@ -57,8 +57,7 @@ app.route("/", sessionRouter);
 // Watch music directory for changes (rescan in worker thread)
 const config = readConfig();
 if (config.dir) {
-  const dbPath = process.env.DATABASE_PATH ?? "athr.db";
-  watchMusicDirectory(config.dir, dbPath);
+  watchMusicDirectory(config.dir);
 }
 
 export default {

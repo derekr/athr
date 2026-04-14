@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import { log } from "evlog";
-import { eventBus } from "../app";
-import type { ScanResult } from "./music-scanner";
+import { db, eventBus } from "../app";
+import { scanMusicDirectory, type ScanResult } from "./music-scanner";
+import { clearCatalogue } from "../projections/catalogue";
 
 let watcherInstance: fs.FSWatcher | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -31,66 +32,43 @@ function publishScanEvent(eventType: string, data: Record<string, unknown>): voi
 }
 
 /**
- * Run the music scanner in a worker thread.
- * Publishes progress and completion events to the event bus.
+ * Run an incremental scan, publishing progress to the event bus.
+ * Runs in the main thread — parseFile() yields the event loop between files.
  */
-export function scanInWorker(musicDir: string, dbPath: string, clear?: boolean): Promise<ScanResult> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./scan-worker.ts", import.meta.url).href);
+export async function runScan(musicDir: string, clear?: boolean): Promise<ScanResult> {
+  publishScanEvent("ScanStarted", { dir: musicDir });
 
-    publishScanEvent("ScanStarted", { dir: musicDir });
+  if (clear) {
+    clearCatalogue(db);
+  }
 
-    worker.onmessage = (event: MessageEvent) => {
-      const msg = event.data;
-
-      if (msg.type === "progress") {
-        publishScanEvent("ScanProgress", {
-          phase: msg.phase,
-          processed: msg.processed,
-          total: msg.total,
-          currentFile: msg.currentFile,
-          added: msg.added,
-          removed: msg.removed,
-        });
-      } else if (msg.type === "complete") {
-        const result: ScanResult = {
-          tracks: msg.tracks,
-          albums: msg.albums,
-          artists: msg.artists,
-          added: msg.added,
-          removed: msg.removed,
-          unchanged: msg.unchanged,
-          errors: msg.errors,
-        };
-
-        publishScanEvent("ScanComplete", {
-          tracks: result.tracks,
-          albums: result.albums,
-          artists: result.artists,
-          added: result.added,
-          removed: result.removed,
-          unchanged: result.unchanged,
-        });
-
-        resolve(result);
-        worker.terminate();
-      }
-    };
-
-    worker.onerror = (err) => {
-      reject(new Error(String(err)));
-      worker.terminate();
-    };
-
-    worker.postMessage({ musicDir, dbPath, clear });
+  const result = await scanMusicDirectory(musicDir, db, (progress) => {
+    publishScanEvent("ScanProgress", {
+      phase: progress.phase,
+      processed: progress.processed,
+      total: progress.total,
+      currentFile: progress.currentFile,
+      added: progress.added,
+      removed: progress.removed,
+    });
   });
+
+  publishScanEvent("ScanComplete", {
+    tracks: result.tracks,
+    albums: result.albums,
+    artists: result.artists,
+    added: result.added,
+    removed: result.removed,
+    unchanged: result.unchanged,
+  });
+
+  return result;
 }
 
 /**
  * Watch a music directory for changes and rescan when audio files change.
- * Debounces rapid changes. Scanning runs in a worker thread.
  */
-export function watchMusicDirectory(musicDir: string, dbPath: string): void {
+export function watchMusicDirectory(musicDir: string): void {
   stopWatching();
 
   if (!fs.existsSync(musicDir)) {
@@ -108,9 +86,9 @@ export function watchMusicDirectory(musicDir: string, dbPath: string): void {
     debounceTimer = setTimeout(() => {
       scanning = true;
       log.info({ action: "watcher_rescan_triggered" });
-      scanInWorker(musicDir, dbPath)
+      runScan(musicDir)
         .then((result) => {
-          log.info({ action: "watcher_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists, added: result.added, removed: result.removed });
+          log.info({ action: "watcher_rescan_complete", added: result.added, removed: result.removed });
         })
         .catch((err) => {
           log.error({ action: "watcher_rescan_failed", error: String(err) });
