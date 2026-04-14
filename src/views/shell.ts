@@ -1,3 +1,5 @@
+import { html, raw } from "hono/html";
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { SessionRow } from "../projections/session";
 import { renderView } from "./content";
 
@@ -24,10 +26,10 @@ const dataEffect = [
   "}",
 ].join(" ");
 
-export function renderShell(sessionId: string, session: SessionRow): string {
+export function renderShell(sessionId: string, session: SessionRow): HtmlEscapedString | Promise<HtmlEscapedString> {
   const viewHtml = renderView(sessionId, session);
 
-  return /* html */ `<!DOCTYPE html>
+  return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -464,7 +466,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
   </nav>
 
   <main id="content">
-    ${viewHtml}
+    ${raw(viewHtml)}
   </main>
 
   <div id="player"
@@ -476,7 +478,7 @@ export function renderShell(sessionId: string, session: SessionRow): string {
        data-signals:_media-artist="''"
        data-signals:_media-album="''"
        data-signals:_media-artwork="''"
-       data-effect="${dataEffect}"
+       data-effect="${raw(dataEffect)}"
        data-init="@get('/s/${sessionId}/sse')">
 
     <audio id="audio"

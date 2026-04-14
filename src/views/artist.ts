@@ -1,6 +1,6 @@
+import { html, raw } from "hono/html";
 import { db } from "../app";
 import { getPlaybackProjection } from "../projections/playback";
-import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
 
 interface ArtistRow {
@@ -25,7 +25,7 @@ interface TrackRow {
 
 export function renderArtist(sessionId: string, artistId: string): string {
   if (!artistId) {
-    return `<div class="empty-state"><div class="icon">👤</div><h2>Artist not found</h2></div>`;
+    return html`<div class="empty-state"><div class="icon">👤</div><h2>Artist not found</h2></div>`.toString();
   }
 
   const artist = db
@@ -33,7 +33,7 @@ export function renderArtist(sessionId: string, artistId: string): string {
     .get(artistId) as ArtistRow | null;
 
   if (!artist) {
-    return `<div class="empty-state"><div class="icon">👤</div><h2>Artist not found</h2></div>`;
+    return html`<div class="empty-state"><div class="icon">👤</div><h2>Artist not found</h2></div>`.toString();
   }
 
   const playback = getPlaybackProjection(db, sessionId);
@@ -54,37 +54,35 @@ export function renderArtist(sessionId: string, artistId: string): string {
     )
     .all(artistId) as TrackRow[];
 
-  return /* html */ `
+  return html`
     <div class="view-header">
       <div style="display: flex; align-items: center; gap: 24px; margin-bottom: 24px;">
         <div style="width: 80px; height: 80px; background: var(--surface2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; flex-shrink: 0;">👤</div>
         <div>
-          <h1>${escHtml(artist.name)}</h1>
-          <div style="color: var(--text-muted); margin-top: 4px;">${albums.length} album${albums.length !== 1 ? "s" : ""} · ${tracks.length} track${tracks.length !== 1 ? "s" : ""}</div>
+          <h1>${artist.name}</h1>
+          <div style="color: var(--text-muted); margin-top: 4px;">${raw(`${albums.length} album${albums.length !== 1 ? "s" : ""} · ${tracks.length} track${tracks.length !== 1 ? "s" : ""}`)}</div>
         </div>
       </div>
     </div>
 
     ${
       albums.length > 0
-        ? /* html */ `
+        ? html`
       <section style="margin-bottom: 32px;">
         <h2 style="font-size: 16px; margin-bottom: 16px; color: var(--text-muted);">Albums</h2>
         <div class="grid">
-          ${albums
-            .map(
-              (album) => /* html */ `
+          ${albums.map(
+              (album) => html`
             <div class="grid-card"
                  data-on:click__prevent="@post('/s/${sessionId}/view/album/${album.id}')">
               <div class="cover">💿</div>
               <div class="card-info">
-                <div class="card-title">${escHtml(album.title)}</div>
+                <div class="card-title">${album.title}</div>
                 <div class="card-subtitle">${album.year ?? ""}</div>
               </div>
             </div>
           `
-            )
-            .join("")}
+            )}
         </div>
       </section>
     `
@@ -94,15 +92,14 @@ export function renderArtist(sessionId: string, artistId: string): string {
     <section>
       <h2 style="font-size: 16px; margin-bottom: 16px; color: var(--text-muted);">All Tracks</h2>
       <div class="track-list">
-        ${tracks
-          .map(
-            (track) => /* html */ `
-          <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+        ${tracks.map(
+            (track) => html`
+          <div class="track-row${raw(track.id === currentTrackId ? " now-playing" : "")}"
                data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
             <div class="track-num">♪</div>
             <div class="track-info">
-              <span class="track-name">${escHtml(track.title)}</span>
-              <span class="track-meta">${escHtml(track.album_title)}</span>
+              <span class="track-name">${track.title}</span>
+              <span class="track-meta">${track.album_title}</span>
             </div>
             <div class="track-duration">${formatDuration(track.duration_ms)}</div>
             <div class="track-actions">
@@ -111,9 +108,8 @@ export function renderArtist(sessionId: string, artistId: string): string {
             </div>
           </div>
         `
-          )
-          .join("")}
+          )}
       </div>
     </section>
-  `;
+  `.toString();
 }

@@ -1,7 +1,7 @@
+import { html, raw } from "hono/html";
 import { db } from "../app";
 import { getPlaybackProjection } from "../projections/playback";
 import { getSearchProjection } from "../projections/search";
-import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
 
 interface SearchResultTrack {
@@ -32,12 +32,12 @@ export function renderSearchResults(
   const playback = getPlaybackProjection(db, sessionId);
   const currentTrackId = playback?.track_id ?? "";
 
-  return /* html */ `
+  return html`
     <div class="search-view">
       <div class="search-bar">
         <input
           type="text"
-          value="${escHtml(search.query)}"
+          value="${search.query}"
           placeholder="Search tracks, albums, artists..."
           data-on:input="@post('/s/${sessionId}/searches/${searchId}?q=' + encodeURIComponent(el.value))"
         />
@@ -45,27 +45,26 @@ export function renderSearchResults(
 
       ${
         results.length === 0
-          ? /* html */ `
+          ? html`
         <div class="empty-state">
           <div class="icon">🔍</div>
           <h2>${search.query ? "No results" : "Search for music"}</h2>
-          <p>${search.query ? `No tracks, albums, or artists found for "${escHtml(search.query)}"` : "Type to search your library"}</p>
+          <p>${search.query ? html`No tracks, albums, or artists found for "${search.query}"` : "Type to search your library"}</p>
         </div>
       `
-          : /* html */ `
+          : html`
         <div style="margin-bottom: 12px; color: var(--text-muted); font-size: 13px;">
-          ${results.length} result${results.length !== 1 ? "s" : ""}
+          ${raw(`${results.length} result${results.length !== 1 ? "s" : ""}`)}
         </div>
         <div class="track-list">
-          ${results
-            .map(
-              (track) => /* html */ `
-            <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+          ${results.map(
+              (track) => html`
+            <div class="track-row${raw(track.id === currentTrackId ? " now-playing" : "")}"
                  data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
               <div class="track-num">♪</div>
               <div class="track-info">
-                <span class="track-name">${escHtml(track.title)}</span>
-                <span class="track-meta">${escHtml(track.artist_name)} · ${escHtml(track.album_title)}${track.year ? ` · ${track.year}` : ""}</span>
+                <span class="track-name">${track.title}</span>
+                <span class="track-meta">${track.artist_name} · ${track.album_title}${track.year ? raw(` · ${track.year}`) : ""}</span>
               </div>
               <div class="track-duration">${formatDuration(track.duration_ms)}</div>
               <div class="track-actions">
@@ -74,22 +73,21 @@ export function renderSearchResults(
               </div>
             </div>
           `
-            )
-            .join("")}
+            )}
         </div>
       `
       }
     </div>
-  `;
+  `.toString();
 }
 
 function renderSearchEmpty(sessionId: string, query: string): string {
-  return /* html */ `
+  return html`
     <div class="search-view">
       <div class="search-bar">
         <input
           type="text"
-          value="${escHtml(query)}"
+          value="${query}"
           placeholder="Search tracks, albums, artists..."
           data-on:input="@post('/s/${sessionId}/searches?q=' + encodeURIComponent(el.value))"
         />
@@ -100,5 +98,5 @@ function renderSearchEmpty(sessionId: string, query: string): string {
         <p>Find tracks, albums, and artists</p>
       </div>
     </div>
-  `;
+  `.toString();
 }

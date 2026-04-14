@@ -1,13 +1,14 @@
+import { html, raw } from "hono/html";
+import type { HtmlEscapedString } from "hono/utils/html";
 import { db } from "../app";
 import { getPlaybackProjection, estimatePositionMs } from "../projections/playback";
 import { formatDuration } from "./player-chrome";
-import { escHtml } from "../lib/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
 
-export function renderMiniPlayerPage(sessionId: string): string {
-  return /* html */ `<!DOCTYPE html>
+export function renderMiniPlayerPage(sessionId: string): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -47,7 +48,7 @@ export function renderMiniPlayerPage(sessionId: string): string {
 </head>
 <body data-init="@get('/s/${sessionId}/sse')">
   <div id="mini-chrome">
-    ${renderMiniChrome(sessionId)}
+    ${raw(renderMiniChrome(sessionId))}
   </div>
 
 </body>
@@ -57,7 +58,7 @@ export function renderMiniPlayerPage(sessionId: string): string {
 export function renderMiniChrome(sessionId: string): string {
   const playback = getPlaybackProjection(db, sessionId);
   if (!playback?.track_id) {
-    return /* html */ `
+    return html`
       <div class="mini-transport">
         <button disabled>⏮</button>
         <button class="play-pause" disabled>▶</button>
@@ -71,7 +72,7 @@ export function renderMiniChrome(sessionId: string): string {
         <div class="progress-track"><div class="progress-fill" style="width: 0%"></div></div>
         <span class="time-label">0:00</span>
       </div>
-    `;
+    `.toString();
   }
 
   const track = db
@@ -81,7 +82,7 @@ export function renderMiniChrome(sessionId: string): string {
     )
     .get(playback.track_id) as { title: string; duration_ms: number; artist_name: string } | null;
 
-  if (!track) return `<div style="color: var(--text-muted)">Track not found</div>`;
+  if (!track) return html`<div style="color: var(--text-muted)">Track not found</div>`.toString();
 
   const positionMs = estimatePositionMs(playback);
   const pct = track.duration_ms > 0
@@ -89,19 +90,19 @@ export function renderMiniChrome(sessionId: string): string {
     : 0;
   const isPlaying = playback.is_playing === 1;
 
-  return /* html */ `
+  return html`
     <div class="mini-transport">
       <button data-on:click__prevent="@post('/s/${sessionId}/playback/prev')" title="Previous">⏮</button>
       <button class="play-pause"
         data-on:click__prevent="@post('/s/${sessionId}/playback/${isPlaying ? "pause" : "resume"}')"
         title="${isPlaying ? "Pause" : "Play"}">
-        ${isPlaying ? "⏸" : "▶"}
+        ${raw(isPlaying ? "⏸" : "▶")}
       </button>
       <button data-on:click__prevent="@post('/s/${sessionId}/playback/next')" title="Next">⏭</button>
     </div>
     <div class="mini-info">
-      <div class="mini-title">${escHtml(track.title)}</div>
-      <div class="mini-artist">${escHtml(track.artist_name)}</div>
+      <div class="mini-title">${track.title}</div>
+      <div class="mini-artist">${track.artist_name}</div>
     </div>
     <div class="mini-progress">
       <span class="time-label" id="mini-time-pos">${formatDuration(positionMs)}</span>
@@ -110,5 +111,5 @@ export function renderMiniChrome(sessionId: string): string {
       </div>
       <span class="time-label" id="mini-time-dur">${formatDuration(track.duration_ms)}</span>
     </div>
-  `;
+  `.toString();
 }

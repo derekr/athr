@@ -1,17 +1,18 @@
+import { html } from "hono/html";
+import type { HtmlEscapedString } from "hono/utils/html";
 import { getSettings } from "../projections/settings";
 import { db } from "../app";
 import { readConfig } from "../lib/config";
-import { escHtml } from "../lib/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
 
-export function renderSettingsPage(sessionId: string): string {
+export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promise<HtmlEscapedString> {
   const settings = getSettings(db, sessionId);
   const config = readConfig();
   const musicDir = (settings["dir"] as string) ?? config.dir ?? "";
 
-  return /* html */ `<!DOCTYPE html>
+  return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -39,7 +40,7 @@ export function renderSettingsPage(sessionId: string): string {
   </style>
 </head>
 <body>
-  <div data-signals:music-dir="${escHtml(musicDir)}"></div>
+  <div data-signals:music-dir="${musicDir}"></div>
 
   <h1>Settings</h1>
 
@@ -48,7 +49,7 @@ export function renderSettingsPage(sessionId: string): string {
       <h2>Library</h2>
       <div class="field">
         <label for="music-dir">Music directory</label>
-        <input type="text" id="music-dir" value="${escHtml(musicDir)}"
+        <input type="text" id="music-dir" value="${musicDir}"
                data-bind:musicDir
                placeholder="/path/to/your/Music" />
       </div>

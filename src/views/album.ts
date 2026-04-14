@@ -1,6 +1,6 @@
+import { html, raw } from "hono/html";
 import { db } from "../app";
 import { getPlaybackProjection } from "../projections/playback";
-import { escHtml } from "./library";
 import { formatDuration } from "./player-chrome";
 
 interface TrackRow {
@@ -24,7 +24,7 @@ interface AlbumRow {
 
 export function renderAlbum(sessionId: string, albumId: string): string {
   if (!albumId) {
-    return `<div class="empty-state"><div class="icon">💿</div><h2>Album not found</h2></div>`;
+    return html`<div class="empty-state"><div class="icon">💿</div><h2>Album not found</h2></div>`.toString();
   }
 
   const album = db
@@ -35,7 +35,7 @@ export function renderAlbum(sessionId: string, albumId: string): string {
     .get(albumId) as AlbumRow | null;
 
   if (!album) {
-    return `<div class="empty-state"><div class="icon">💿</div><h2>Album not found</h2></div>`;
+    return html`<div class="empty-state"><div class="icon">💿</div><h2>Album not found</h2></div>`.toString();
   }
 
   const playback = getPlaybackProjection(db, sessionId);
@@ -53,19 +53,19 @@ export function renderAlbum(sessionId: string, albumId: string): string {
     )
     .all(albumId) as TrackRow[];
 
-  return /* html */ `
+  return html`
     <div class="view-header">
       <div style="display: flex; align-items: flex-start; gap: 24px; margin-bottom: 24px;">
-        <img src="/cover/${albumId}" alt="${escHtml(album.title)}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--surface2);" />
+        <img src="/cover/${albumId}" alt="${album.title}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--surface2);" />
         <div>
-          <h1>${escHtml(album.title)}</h1>
+          <h1>${album.title}</h1>
           <div style="margin-top: 4px;">
             <button
               data-on:click__prevent="@post('/s/${sessionId}/view/artist/${album.artist_id}')"
               style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 15px; padding: 0;">
-              ${escHtml(album.artist_name)}
+              ${album.artist_name}
             </button>
-            ${album.year ? `<span style="color: var(--text-muted)"> · ${album.year}</span>` : ""}
+            ${album.year ? raw(`<span style="color: var(--text-muted)"> · ${album.year}</span>`) : ""}
           </div>
           <div style="margin-top: 12px; display: flex; gap: 8px;">
             <button
@@ -84,14 +84,13 @@ export function renderAlbum(sessionId: string, albumId: string): string {
     </div>
 
     <div class="track-list">
-      ${tracks
-        .map(
-          (track, i) => /* html */ `
-        <div class="track-row${track.id === currentTrackId ? " now-playing" : ""}"
+      ${tracks.map(
+          (track, i) => html`
+        <div class="track-row${raw(track.id === currentTrackId ? " now-playing" : "")}"
              data-on:dblclick__prevent="@post('/s/${sessionId}/play/${track.id}')">
           <div class="track-num">${track.track_number ?? i + 1}</div>
           <div class="track-info">
-            <span class="track-name">${escHtml(track.title)}</span>
+            <span class="track-name">${track.title}</span>
           </div>
           <div class="track-duration">${formatDuration(track.duration_ms)}</div>
           <div class="track-actions">
@@ -100,8 +99,7 @@ export function renderAlbum(sessionId: string, albumId: string): string {
           </div>
         </div>
       `
-        )
-        .join("")}
+        )}
     </div>
-  `;
+  `.toString();
 }

@@ -1,6 +1,6 @@
+import { html, raw } from "hono/html";
 import { db } from "../app";
 import { getPlaybackProjection, estimatePositionMs } from "../projections/playback";
-import { escHtml } from "./library";
 
 interface TrackRow {
   id: string;
@@ -57,7 +57,7 @@ export function renderPlayerChrome(sessionId: string): string {
 
   const isPlaying = playback.is_playing === 1;
 
-  return /* html */ `
+  return html`
     <div class="player-transport">
       <button
         data-on:click__prevent="@post('/s/${sessionId}/playback/prev')"
@@ -65,7 +65,7 @@ export function renderPlayerChrome(sessionId: string): string {
       <button
         data-on:click__prevent="@post('/s/${sessionId}/playback/${isPlaying ? "pause" : "resume"}')"
         title="${isPlaying ? "Pause" : "Play"}">
-        ${isPlaying ? "⏸" : "▶"}
+        ${raw(isPlaying ? "⏸" : "▶")}
       </button>
       <button
         data-on:click__prevent="@post('/s/${sessionId}/playback/next')"
@@ -74,31 +74,31 @@ export function renderPlayerChrome(sessionId: string): string {
 
     <a href="/s/${sessionId}/album/${track.album_id}"
        data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')">
-      <img src="/cover/${track.album_id}" alt="${escHtml(album?.title ?? "")}"
+      <img src="/cover/${track.album_id}" alt="${album?.title ?? ""}"
            style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: var(--surface2);" />
     </a>
 
     <div class="player-track-info">
-      <span class="track-title">${escHtml(track.title)}</span>
+      <span class="track-title">${track.title}</span>
       <span class="track-artist">
         <a href="/s/${sessionId}/artist/${track.artist_id}"
            data-on:click__prevent="@post('/s/${sessionId}/view/artist/${track.artist_id}')"
-           class="player-link">${escHtml(artist?.name ?? "Unknown")}</a>
+           class="player-link">${artist?.name ?? "Unknown"}</a>
         —
         <a href="/s/${sessionId}/album/${track.album_id}"
            data-on:click__prevent="@post('/s/${sessionId}/view/album/${track.album_id}')"
-           class="player-link">${escHtml(album?.title ?? "Unknown")}</a>
+           class="player-link">${album?.title ?? "Unknown"}</a>
       </span>
     </div>
 
     <div class="player-progress">
       <span class="time-label" id="time-pos">${formatDuration(positionMs)}</span>
       <div class="progress-track"
-           data-on:click__prevent="
+           data-on:click__prevent="${raw(`
              const rect = el.getBoundingClientRect();
              const pct = (evt.clientX - rect.left) / rect.width;
              @post('/s/${sessionId}/playback/seek/' + Math.floor(pct * ${track.duration_ms}))
-           ">
+           `)}">
         <div class="progress-fill" id="progress-fill" style="width: ${progressPct.toFixed(2)}%;"></div>
       </div>
       <span class="time-label" id="time-dur">${formatDuration(track.duration_ms)}</span>
@@ -109,11 +109,11 @@ export function renderPlayerChrome(sessionId: string): string {
       <input type="range" min="0" max="100" value="${Math.round(playback.volume * 100)}"
              data-on:input__throttle.500ms="@post('/s/${sessionId}/volume/' + (el.value / 100))" />
     </div>
-  `;
+  `.toString();
 }
 
 function renderEmptyPlayer(sessionId: string): string {
-  return /* html */ `
+  return html`
     <div class="player-transport">
       <button disabled>⏮</button>
       <button disabled>▶</button>
@@ -134,5 +134,5 @@ function renderEmptyPlayer(sessionId: string): string {
       <input type="range" min="0" max="100" value="100"
              data-on:input__throttle.500ms="@post('/s/${sessionId}/volume/' + (el.value / 100))" />
     </div>
-  `;
+  `.toString();
 }

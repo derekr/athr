@@ -1,5 +1,5 @@
+import { html } from "hono/html";
 import { db } from "../app";
-import { escHtml } from "../lib/html";
 
 interface AlbumRow {
   id: string;
@@ -29,16 +29,16 @@ export function renderLibrary(sessionId: string): string {
     .all() as ArtistRow[];
 
   if (albums.length === 0) {
-    return /* html */ `
+    return html`
       <div class="empty-state">
         <div class="icon">🎵</div>
         <h2>No music yet</h2>
         <p>Open Settings to point athr at your music folder.</p>
       </div>
-    `;
+    `.toString();
   }
 
-  return /* html */ `
+  return html`
     <div class="view-header">
       <h1>Library</h1>
     </div>
@@ -46,42 +46,37 @@ export function renderLibrary(sessionId: string): string {
     <section style="margin-bottom: 32px;">
       <h2 style="font-size: 16px; margin-bottom: 16px; color: var(--text-muted);">Artists</h2>
       <div class="grid">
-        ${artists
-          .map(
-            (artist) => /* html */ `
+        ${artists.map(
+            (artist) => html`
           <div class="grid-card"
                data-on:click__prevent="@post('/s/${sessionId}/view/artist/${artist.id}')">
             <div class="cover">👤</div>
             <div class="card-info">
-              <div class="card-title">${escHtml(artist.name)}</div>
+              <div class="card-title">${artist.name}</div>
             </div>
           </div>
         `
-          )
-          .join("")}
+          )}
       </div>
     </section>
 
     <section>
       <h2 style="font-size: 16px; margin-bottom: 16px; color: var(--text-muted);">Albums</h2>
       <div class="grid">
-        ${albums
-          .map(
-            (album) => /* html */ `
+        ${albums.map(
+            (album) => html`
           <div class="grid-card"
                data-on:click__prevent="@post('/s/${sessionId}/view/album/${album.id}')">
-            <img class="cover" src="/cover/${album.id}" alt="${escHtml(album.title)}" loading="lazy" />
+            <img class="cover" src="/cover/${album.id}" alt="${album.title}" loading="lazy" />
             <div class="card-info">
-              <div class="card-title">${escHtml(album.title)}</div>
-              <div class="card-subtitle">${escHtml(album.artist_name)}${album.year ? ` · ${album.year}` : ""}</div>
+              <div class="card-title">${album.title}</div>
+              <div class="card-subtitle">${album.artist_name}${album.year ? ` · ${album.year}` : ""}</div>
             </div>
           </div>
         `
-          )
-          .join("")}
+          )}
       </div>
     </section>
-  `;
+  `.toString();
 }
 
-export { escHtml } from "../lib/html";

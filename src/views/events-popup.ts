@@ -1,10 +1,11 @@
-import { escHtml } from "../lib/html";
+import { html, raw } from "hono/html";
+import type { HtmlEscapedString } from "hono/utils/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
 
-export function renderEventsPage(sessionId: string): string {
-  return /* html */ `<!DOCTYPE html>
+export function renderEventsPage(sessionId: string): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -108,16 +109,16 @@ export function renderEventItem(event: {
   const shortData = dataStr.length > 120 ? dataStr.slice(0, 120) + "\u2026" : dataStr;
   const runAttr = runId != null ? ` id="run-${runId}"` : "";
 
-  return /* html */ `
-    <div class="event"${runAttr}>
+  return html`
+    <div class="event"${raw(runAttr)}>
       <div class="event-header">
-        <span class="event-type">${escHtml(event.eventType)}</span>
-        <span class="event-stream">${escHtml(event.streamId)}</span>
-        <span class="event-time">${escHtml(time)}</span>
+        <span class="event-type">${event.eventType}</span>
+        <span class="event-stream">${event.streamId}</span>
+        <span class="event-time">${time}</span>
       </div>
-      <div class="event-data">${escHtml(shortData)}</div>
+      <div class="event-data">${shortData}</div>
     </div>
-  `;
+  `.toString();
 }
 
 export function renderRunBadge(runId: number, count: number, event: {
@@ -130,15 +131,15 @@ export function renderRunBadge(runId: number, count: number, event: {
   const dataStr = JSON.stringify(event.data);
   const shortData = dataStr.length > 120 ? dataStr.slice(0, 120) + "\u2026" : dataStr;
 
-  return /* html */ `
+  return html`
     <div class="event" id="run-${runId}">
       <div class="event-header">
-        <span class="event-type">${escHtml(event.eventType)}</span>
-        <span class="run-count">&times;${count}</span>
-        <span class="event-stream">${escHtml(event.streamId)}</span>
-        <span class="event-time">${escHtml(time)}</span>
+        <span class="event-type">${event.eventType}</span>
+        <span class="run-count">${raw("&times;")}${count}</span>
+        <span class="event-stream">${event.streamId}</span>
+        <span class="event-time">${time}</span>
       </div>
-      <div class="event-data">${escHtml(shortData)}</div>
+      <div class="event-data">${shortData}</div>
     </div>
-  `;
+  `.toString();
 }

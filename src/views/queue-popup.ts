@@ -1,8 +1,9 @@
+import { html, raw } from "hono/html";
+import type { HtmlEscapedString } from "hono/utils/html";
 import { db } from "../app";
 import { getQueue } from "../projections/queue";
 import { getPlaybackProjection } from "../projections/playback";
 import { formatDuration } from "./player-chrome";
-import { escHtml } from "../lib/html";
 
 const DATASTAR_CDN =
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.8/bundles/datastar.min.js";
@@ -15,8 +16,8 @@ interface QueueTrack {
   duration_ms: number;
 }
 
-export function renderQueuePage(sessionId: string): string {
-  return /* html */ `<!DOCTYPE html>
+export function renderQueuePage(sessionId: string): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -57,7 +58,7 @@ export function renderQueuePage(sessionId: string): string {
     </button>
   </div>
   <div id="queue-list">
-    ${renderQueueList(sessionId)}
+    ${raw(renderQueueList(sessionId))}
   </div>
 
 </body>
@@ -87,23 +88,22 @@ export function renderQueueList(sessionId: string): string {
       : { track_id: item.track_id, position: item.position, title: "Unknown", artist_name: "Unknown", duration_ms: 0 };
   });
 
-  return `<div class="queue-list">
-    ${tracks
-      .map(
-        (track) => /* html */ `
-      <div class="queue-item${track.position === currentQueuePos ? " current" : track.position < currentQueuePos ? " played" : ""}">
+  return html`<div class="queue-list">
+    ${tracks.map(
+        (track) => html`
+      <div class="queue-item${raw(track.position === currentQueuePos ? " current" : track.position < currentQueuePos ? " played" : "")}">
         <div class="pos">${track.position + 1}</div>
         <div class="info">
-          <span class="title">${escHtml(track.title)}</span>
-          <span class="artist">${escHtml(track.artist_name)}</span>
+          <span class="title">${track.title}</span>
+          <span class="artist">${track.artist_name}</span>
         </div>
         <div class="duration">${formatDuration(track.duration_ms)}</div>
         <div class="actions">
           ${track.position === currentQueuePos && playback?.is_playing
-            ? `<button
+            ? html`<button
                 data-on:click__prevent="@post('/s/${sessionId}/playback/pause')"
                 title="Pause">⏸</button>`
-            : `<button
+            : html`<button
                 data-on:click__prevent="@post('/s/${sessionId}/play/${track.track_id}')"
                 title="Play">▶</button>`
           }
@@ -113,7 +113,6 @@ export function renderQueueList(sessionId: string): string {
         </div>
       </div>
     `
-      )
-      .join("")}
-  </div>`;
+      )}
+  </div>`.toString();
 }
