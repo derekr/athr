@@ -37,10 +37,6 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Ad-hoc sign macOS binary with JIT entitlements
-        if: runner.os == 'macOS'
-        run: codesign --deep --force --sign - --entitlements entitlements.plist athr
-
       - run: mv athr athr-${{ matrix.target }}
 
       - uses: actions/upload-artifact@v4

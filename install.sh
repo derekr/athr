@@ -44,11 +44,28 @@ mkdir -p "$INSTALL_DIR"
 curl -fsSL "$URL" -o "${INSTALL_DIR}/athr"
 chmod +x "${INSTALL_DIR}/athr"
 
+# macOS: ad-hoc sign with JIT entitlements (required for Bun compiled binaries)
+if [ "$OS" = "darwin" ] && command -v codesign > /dev/null 2>&1; then
+  # Download entitlements plist
+  ENTITLEMENTS=$(mktemp)
+  curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/entitlements.plist" -o "$ENTITLEMENTS"
+  if codesign --deep --force --sign - --entitlements "$ENTITLEMENTS" "${INSTALL_DIR}/athr" 2>/dev/null; then
+    echo "  Signed for macOS"
+  else
+    echo "  Warning: code signing failed — you may need to sign manually"
+    echo "  codesign --deep --force --sign - --entitlements entitlements.plist ${INSTALL_DIR}/athr"
+  fi
+  rm -f "$ENTITLEMENTS"
+fi
+
 # Verify
 if "${INSTALL_DIR}/athr" --help > /dev/null 2>&1; then
   echo "Installed successfully!"
 else
   echo "Installed binary but it may not run on this platform."
+  if [ "$OS" = "darwin" ]; then
+    echo "  Try: codesign --deep --force --sign - ${INSTALL_DIR}/athr"
+  fi
 fi
 
 # Check PATH
