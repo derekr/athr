@@ -114,7 +114,26 @@ These features could also be implemented as modals or in-page panels morphed via
 | Audio metadata | `music-metadata` |
 | Logging | [evlog](https://evlog.dev) (server + client) |
 
-## Quick Start
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/derekr/athr/main/install.sh | sh
+```
+
+This downloads the latest release binary for your platform to `~/.local/bin/athr`. Override the install location with `ATHR_INSTALL_DIR`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/derekr/athr/main/install.sh | ATHR_INSTALL_DIR=/usr/local/bin sh
+```
+
+Then:
+
+```bash
+athr serve --dir ~/Music
+# Open http://localhost:3000
+```
+
+## Quick Start (from source)
 
 ```bash
 # Install dependencies
