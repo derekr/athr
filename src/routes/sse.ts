@@ -100,12 +100,21 @@ async function onSettingsUpdatedMain(s: Writer, sessionId: string): Promise<void
   await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
 }
 
+let lastCatalogueRender = 0;
+const CATALOGUE_RENDER_THROTTLE_MS = 500;
+
 async function onCatalogueChangedMain(s: Writer, sessionId: string, eventType: string): Promise<void> {
-  const rerenderEvents = ["ScanComplete", "CatalogueCleared"];
-  if (rerenderEvents.includes(eventType)) {
-    const session = getSessionProjection(db, sessionId);
-    if (session && ["library", "album", "artist"].includes(session.current_view)) {
+  const session = getSessionProjection(db, sessionId);
+  if (!session || !["library", "album", "artist"].includes(session.current_view)) return;
+
+  if (eventType === "CatalogueCleared" || eventType === "ScanComplete") {
+    await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
+    lastCatalogueRender = Date.now();
+  } else if (eventType === "ScanProgress") {
+    const now = Date.now();
+    if (now - lastCatalogueRender >= CATALOGUE_RENDER_THROTTLE_MS) {
       await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
+      lastCatalogueRender = now;
     }
   }
 }
