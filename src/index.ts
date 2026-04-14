@@ -15,6 +15,8 @@ import searchRouter from "./routes/search";
 import settingsRouter from "./routes/settings";
 import eventsRouter from "./routes/events";
 import miniRouter from "./routes/mini";
+import { readConfig } from "./lib/config";
+import { watchMusicDirectory } from "./lib/music-watcher";
 
 initLogger({
   env: { service: "athr" },
@@ -51,6 +53,13 @@ app.route("/", settingsRouter);
 app.route("/", eventsRouter);
 app.route("/", miniRouter);
 app.route("/", sessionRouter);
+
+// Watch music directory for changes (rescan in worker thread)
+const config = readConfig();
+if (config.dir) {
+  const dbPath = process.env.DATABASE_PATH ?? "athr.db";
+  watchMusicDirectory(config.dir, dbPath);
+}
 
 export default {
   fetch: app.fetch,

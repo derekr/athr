@@ -1,10 +1,12 @@
 import { Hono } from "hono";
+import { log } from "evlog";
 import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/serverSentEventGenerator.js";
 import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderSettingsPage } from "../views/settings";
 import { updateConfig } from "../lib/config";
 import { scanMusicDirectory } from "../lib/music-scanner";
+import { watchMusicDirectory } from "../lib/music-watcher";
 import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
@@ -43,13 +45,14 @@ router.post("/s/:id/settings/update", async (c) => {
 
   updateConfig("dir", musicDir);
 
+  const dbPath = process.env.DATABASE_PATH ?? "athr.db";
   void scanMusicDirectory(musicDir, db).then((result) => {
-    console.log(
-      `Rescan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists`
-    );
+    log.info({ action: "rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
     if (result.errors.length > 0) {
-      console.warn(`Scan errors: ${result.errors.join(", ")}`);
+      log.warn({ action: "rescan_errors", errors: result.errors });
     }
+    // Restart watcher on new directory
+    watchMusicDirectory(musicDir, dbPath);
   });
 
   return ServerSentEventGenerator.stream(c.req.raw, (sse) => {
