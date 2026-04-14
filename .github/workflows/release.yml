@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "vault/**"
+      - ".github/**"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for changelog
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+
+      - run: bun run build
+        env:
+          NODE_ENV: production
+
+      - run: mv athr athr-${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: athr-${{ matrix.target }}
+          path: athr-${{ matrix.target }}
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION=$(date -u +%Y.%m.%d)
+          # Append build number if multiple releases same day
+          EXISTING=$(gh release list --limit 100 --json tagName -q ".[].tagName" | grep "^v${VERSION}" | wc -l)
+          if [ "$EXISTING" -gt "0" ]; then
+            VERSION="${VERSION}.${EXISTING}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Find the previous release tag
+          PREV_TAG=$(git tag --sort=-creatordate | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            # First release — changelog from all commits
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          # Group commits by type based on first word of message
+          echo "## What's Changed" > /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+
+          # Features and improvements
+          FEATURES=$(git log "$RANGE" --pretty=format:"- %s" --no-merges | grep -iE "^- (Add|Implement|Create)" || true)
+          if [ -n "$FEATURES" ]; then
+            echo "### New" >> /tmp/changelog.md
+            echo "$FEATURES" >> /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+          fi
+
+          # Fixes
+          FIXES=$(git log "$RANGE" --pretty=format:"- %s" --no-merges | grep -iE "^- Fix" || true)
+          if [ -n "$FIXES" ]; then
+            echo "### Fixed" >> /tmp/changelog.md
+            echo "$FIXES" >> /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+          fi
+
+          # Refactoring and cleanup
+          REFACTORS=$(git log "$RANGE" --pretty=format:"- %s" --no-merges | grep -iE "^- (Refactor|Deduplicate|Simplify|Clean|Optimize|Remove|Migrate|Convert)" || true)
+          if [ -n "$REFACTORS" ]; then
+            echo "### Improved" >> /tmp/changelog.md
+            echo "$REFACTORS" >> /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+          fi
+
+          # Everything else
+          OTHER=$(git log "$RANGE" --pretty=format:"- %s" --no-merges | grep -viE "^- (Add|Implement|Create|Fix|Refactor|Deduplicate|Simplify|Clean|Optimize|Remove|Migrate|Convert)" || true)
+          if [ -n "$OTHER" ]; then
+            echo "### Other" >> /tmp/changelog.md
+            echo "$OTHER" >> /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+          fi
+
+          # Stats
+          COMMIT_COUNT=$(git rev-list "$RANGE" --count --no-merges)
+          echo "---" >> /tmp/changelog.md
+          echo "*${COMMIT_COUNT} commits since last release*" >> /tmp/changelog.md
+
+          cat /tmp/changelog.md
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "athr ${{ steps.version.outputs.tag }}" \
+            --notes-file /tmp/changelog.md \
+            artifacts/athr-darwin-arm64/athr-darwin-arm64 \
+            artifacts/athr-darwin-x64/athr-darwin-x64 \
+            artifacts/athr-linux-x64/athr-linux-x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
