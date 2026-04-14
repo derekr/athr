@@ -19,8 +19,6 @@ jobs:
         include:
           - os: macos-latest
             target: darwin-arm64
-          - os: macos-13
-            target: darwin-x64
           - os: ubuntu-latest
             target: linux-x64
 
@@ -133,7 +131,6 @@ jobs:
             --title "athr ${{ steps.version.outputs.tag }}" \
             --notes-file /tmp/changelog.md \
             artifacts/athr-darwin-arm64/athr-darwin-arm64 \
-            artifacts/athr-darwin-x64/athr-darwin-x64 \
             artifacts/athr-linux-x64/athr-linux-x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
