@@ -1,6 +1,6 @@
 ---
 title: "Incremental scanning with live library updates"
-status: todo
+status: done
 updated: 2026-04-14
 ---
 
