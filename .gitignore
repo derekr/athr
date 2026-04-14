@@ -1,6 +1,6 @@
 node_modules/
 .claude/settings.local.json
-athr
+/athr
 *.db
 *.db-shm
 *.db-wal
