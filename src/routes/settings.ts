@@ -4,7 +4,7 @@ import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/s
 import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderSettingsPage } from "../views/settings";
-import { updateConfig } from "../lib/config";
+import { readConfig, updateConfig } from "../lib/config";
 import { scanMusicDirectory } from "../lib/music-scanner";
 import { watchMusicDirectory } from "../lib/music-watcher";
 import { getSessionVersion } from "../lib/session-version";
@@ -58,6 +58,32 @@ router.post("/s/:id/settings/update", async (c) => {
   return ServerSentEventGenerator.stream(c.req.raw, (sse) => {
     sse.patchElements(
       `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Saved! Scanning library…</div>`
+    );
+  });
+});
+
+/** POST /s/:id/settings/rescan — Rescan library without changing settings */
+router.post("/s/:id/settings/rescan", (c) => {
+  const sessionId = c.req.param("id");
+  if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
+
+  const config = readConfig();
+  const musicDir = config.dir;
+  if (!musicDir) {
+    return ServerSentEventGenerator.stream((sse) => {
+      sse.patchElements(
+        `<div id="feedback" style="color: #ef4444; font-size: 13px; margin-top: 12px;">No music directory configured.</div>`
+      );
+    });
+  }
+
+  void scanMusicDirectory(musicDir, db).then((result) => {
+    log.info({ action: "manual_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
+  });
+
+  return ServerSentEventGenerator.stream((sse) => {
+    sse.patchElements(
+      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Rescanning library…</div>`
     );
   });
 });

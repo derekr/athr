@@ -53,10 +53,17 @@ export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promi
                data-bind:musicDir
                placeholder="/path/to/your/Music" />
       </div>
-      <button
-        data-on:click__prevent="@post('/s/${sessionId}/settings/update')">
-        Save &amp; Rescan
-      </button>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button type="submit"
+          data-on:click__prevent="@post('/s/${sessionId}/settings/update')">
+          Save &amp; Rescan
+        </button>
+        <button type="submit"
+          data-on:click__prevent="@post('/s/${sessionId}/settings/rescan')"
+          style="background: var(--surface2); border: 1px solid var(--border);">
+          Rescan Only
+        </button>
+      </div>
     </div>
 
     <div id="feedback"></div>
