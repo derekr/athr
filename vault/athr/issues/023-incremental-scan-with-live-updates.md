@@ -31,6 +31,12 @@ Walk the directory and compare:
 
 Skip unchanged files entirely. This makes rescans fast for large libraries with few changes.
 
+### Why single-pass, not entity-level batching
+
+The bottleneck is metadata parsing (~5-10ms per file, I/O bound). A two-pass approach (discover albums first, then tracks) would parse every file twice for no benefit. SQLite upserts are sub-millisecond — the DB writes are essentially free compared to the file reads.
+
+The natural grain is one file at a time: parse metadata → upsert artist → upsert album → upsert track → emit events. For the incremental version, `stat()` (~0.01ms) determines whether to parse at all, saving ~500x per unchanged file. Entity-level passes would fight the filesystem's access pattern rather than work with it.
+
 ### 2. Granular domain events
 
 Instead of the scanner being a silent batch process, emit events for catalogue changes:
