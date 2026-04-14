@@ -60,7 +60,11 @@ async function runServe(): Promise<void> {
   if (musicDir) {
     console.log(`Scanning music directory: ${musicDir}`);
     const result = await scanMusicDirectory(musicDir, db);
-    console.log(`Scan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists`);
+    const counts = db.prepare(`SELECT
+      (SELECT COUNT(*) FROM tracks) as tracks,
+      (SELECT COUNT(*) FROM albums) as albums,
+      (SELECT COUNT(*) FROM artists) as artists`).get() as { tracks: number; albums: number; artists: number };
+    console.log(`Scan complete: ${counts.tracks} tracks, ${counts.albums} albums, ${counts.artists} artists (${result.added} added, ${result.removed} removed)`);
     if (result.errors.length > 0) {
       console.warn(`Scan errors (${result.errors.length}):`);
       for (const err of result.errors.slice(0, 10)) {
