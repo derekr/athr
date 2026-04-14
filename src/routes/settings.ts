@@ -63,7 +63,7 @@ router.post("/s/:id/settings/update", async (c) => {
 });
 
 /** POST /s/:id/settings/rescan — Rescan library without changing settings */
-router.post("/s/:id/settings/rescan", (c) => {
+router.post("/s/:id/settings/rescan", async (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
@@ -77,13 +77,12 @@ router.post("/s/:id/settings/rescan", (c) => {
     });
   }
 
-  void scanMusicDirectory(musicDir, db).then((result) => {
-    log.info({ action: "manual_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
-  });
+  const result = await scanMusicDirectory(musicDir, db);
+  log.info({ action: "manual_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
-      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Rescanning library…</div>`
+      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Rescan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists</div>`
     );
   });
 });
