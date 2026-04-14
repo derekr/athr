@@ -40,6 +40,7 @@ export async function runScan(musicDir: string, clear?: boolean): Promise<ScanRe
 
   if (clear) {
     clearCatalogue(db);
+    publishScanEvent("CatalogueCleared", {});
   }
 
   const result = await scanMusicDirectory(musicDir, db, (progress) => {

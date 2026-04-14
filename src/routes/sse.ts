@@ -101,8 +101,8 @@ async function onSettingsUpdatedMain(s: Writer, sessionId: string): Promise<void
 }
 
 async function onCatalogueChangedMain(s: Writer, sessionId: string, eventType: string): Promise<void> {
-  // Re-render library view on scan completion (content may have changed)
-  if (eventType === "ScanComplete") {
+  const rerenderEvents = ["ScanComplete", "CatalogueCleared"];
+  if (rerenderEvents.includes(eventType)) {
     const session = getSessionProjection(db, sessionId);
     if (session && ["library", "album", "artist"].includes(session.current_view)) {
       await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
