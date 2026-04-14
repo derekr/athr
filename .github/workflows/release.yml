@@ -37,6 +37,10 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Ad-hoc sign macOS binary
+        if: runner.os == 'macOS'
+        run: codesign --force --sign - athr
+
       - run: mv athr athr-${{ matrix.target }}
 
       - uses: actions/upload-artifact@v4
