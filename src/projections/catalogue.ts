@@ -12,9 +12,13 @@ export function initCatalogue(db: Database): void {
       duration_ms INTEGER NOT NULL,
       file_path TEXT NOT NULL,
       format TEXT NOT NULL,
+      mtime_ms INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+
+  // Migration: add mtime_ms if missing
+  try { db.run(`ALTER TABLE tracks ADD COLUMN mtime_ms INTEGER NOT NULL DEFAULT 0`); } catch { /* exists */ }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS albums (
@@ -62,6 +66,7 @@ export interface TrackRecord {
   durationMs: number;
   filePath: string;
   format: string;
+  mtimeMs?: number;
 }
 
 export function upsertArtist(db: Database, artist: ArtistRecord): void {
@@ -92,7 +97,7 @@ export function upsertAlbum(db: Database, album: AlbumRecord): void {
 
 export function upsertTrack(db: Database, track: TrackRecord): void {
   db.run(
-    `INSERT INTO tracks (id, title, artist_id, album_id, track_number, duration_ms, file_path, format) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO tracks (id, title, artist_id, album_id, track_number, duration_ms, file_path, format, mtime_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        title = excluded.title,
        artist_id = excluded.artist_id,
@@ -100,7 +105,8 @@ export function upsertTrack(db: Database, track: TrackRecord): void {
        track_number = excluded.track_number,
        duration_ms = excluded.duration_ms,
        file_path = excluded.file_path,
-       format = excluded.format`,
+       format = excluded.format,
+       mtime_ms = excluded.mtime_ms`,
     [
       track.id,
       track.title,
@@ -110,8 +116,15 @@ export function upsertTrack(db: Database, track: TrackRecord): void {
       track.durationMs,
       track.filePath,
       track.format,
+      track.mtimeMs ?? 0,
     ]
   );
+}
+
+export function clearCatalogue(db: Database): void {
+  db.run(`DELETE FROM tracks`);
+  db.run(`DELETE FROM albums`);
+  db.run(`DELETE FROM artists`);
 }
 
 export function getTrack(

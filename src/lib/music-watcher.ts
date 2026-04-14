@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import { log } from "evlog";
+import { eventBus } from "../app";
 import type { ScanResult } from "./music-scanner";
 
 let watcherInstance: fs.FSWatcher | null = null;
@@ -16,28 +17,78 @@ function isAudioFile(filename: string | null): boolean {
   return AUDIO_EXTENSIONS.has(ext);
 }
 
-/**
- * Run the music scanner in a worker thread so it doesn't block the main thread.
- */
-function scanInWorker(musicDir: string, dbPath: string): Promise<ScanResult> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./scan-worker.ts", import.meta.url).href);
-    worker.onmessage = (event: MessageEvent<ScanResult>) => {
-      resolve(event.data);
-      worker.terminate();
-    };
-    worker.onerror = (err) => {
-      reject(new Error(String(err)));
-      worker.terminate();
-    };
-    worker.postMessage({ musicDir, dbPath });
+function publishScanEvent(eventType: string, data: Record<string, unknown>): void {
+  eventBus.publish({
+    id: 0,
+    streamId: "catalogue",
+    streamVersion: 0,
+    eventType,
+    data,
+    schemaVersion: 1,
+    correlationId: null,
+    createdAt: new Date().toISOString(),
   });
 }
 
 /**
- * Watch a music directory for changes and rescan when audio files are added/removed.
- * Debounces rapid changes (e.g., copying an album folder) into a single rescan.
- * Scanning runs in a worker thread to avoid blocking the server.
+ * Run the music scanner in a worker thread.
+ * Publishes progress and completion events to the event bus.
+ */
+export function scanInWorker(musicDir: string, dbPath: string, clear?: boolean): Promise<ScanResult> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./scan-worker.ts", import.meta.url).href);
+
+    publishScanEvent("ScanStarted", { dir: musicDir });
+
+    worker.onmessage = (event: MessageEvent) => {
+      const msg = event.data;
+
+      if (msg.type === "progress") {
+        publishScanEvent("ScanProgress", {
+          phase: msg.phase,
+          processed: msg.processed,
+          total: msg.total,
+          currentFile: msg.currentFile,
+          added: msg.added,
+          removed: msg.removed,
+        });
+      } else if (msg.type === "complete") {
+        const result: ScanResult = {
+          tracks: msg.tracks,
+          albums: msg.albums,
+          artists: msg.artists,
+          added: msg.added,
+          removed: msg.removed,
+          unchanged: msg.unchanged,
+          errors: msg.errors,
+        };
+
+        publishScanEvent("ScanComplete", {
+          tracks: result.tracks,
+          albums: result.albums,
+          artists: result.artists,
+          added: result.added,
+          removed: result.removed,
+          unchanged: result.unchanged,
+        });
+
+        resolve(result);
+        worker.terminate();
+      }
+    };
+
+    worker.onerror = (err) => {
+      reject(new Error(String(err)));
+      worker.terminate();
+    };
+
+    worker.postMessage({ musicDir, dbPath, clear });
+  });
+}
+
+/**
+ * Watch a music directory for changes and rescan when audio files change.
+ * Debounces rapid changes. Scanning runs in a worker thread.
  */
 export function watchMusicDirectory(musicDir: string, dbPath: string): void {
   stopWatching();
@@ -59,10 +110,7 @@ export function watchMusicDirectory(musicDir: string, dbPath: string): void {
       log.info({ action: "watcher_rescan_triggered" });
       scanInWorker(musicDir, dbPath)
         .then((result) => {
-          log.info({ action: "watcher_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
-          if (result.errors.length > 0) {
-            log.warn({ action: "watcher_rescan_errors", errors: result.errors });
-          }
+          log.info({ action: "watcher_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists, added: result.added, removed: result.removed });
         })
         .catch((err) => {
           log.error({ action: "watcher_rescan_failed", error: String(err) });

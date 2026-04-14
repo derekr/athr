@@ -1,15 +1,15 @@
 import { Hono } from "hono";
-import { log } from "evlog";
 import { ServerSentEventGenerator } from "@starfederation/datastar-sdk/src/web/serverSentEventGenerator.js";
 import { db, appendEvents } from "../app";
 import { getSessionProjection } from "../projections/session";
 import { renderSettingsPage } from "../views/settings";
 import { readConfig, updateConfig } from "../lib/config";
-import { scanMusicDirectory } from "../lib/music-scanner";
-import { watchMusicDirectory } from "../lib/music-watcher";
+import { scanInWorker, watchMusicDirectory } from "../lib/music-watcher";
 import { getSessionVersion } from "../lib/session-version";
 
 const router = new Hono();
+
+const dbPath = process.env.DATABASE_PATH ?? "athr.db";
 
 /** GET /s/:id/settings — Settings popup page */
 router.get("/s/:id/settings", (c) => {
@@ -20,7 +20,7 @@ router.get("/s/:id/settings", (c) => {
   return c.html(renderSettingsPage(sessionId));
 });
 
-/** POST /s/:id/settings/update — Update a setting */
+/** POST /s/:id/settings/update — Update a setting and rescan */
 router.post("/s/:id/settings/update", async (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
@@ -45,25 +45,20 @@ router.post("/s/:id/settings/update", async (c) => {
 
   updateConfig("dir", musicDir);
 
-  const dbPath = process.env.DATABASE_PATH ?? "athr.db";
-  void scanMusicDirectory(musicDir, db).then((result) => {
-    log.info({ action: "rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
-    if (result.errors.length > 0) {
-      log.warn({ action: "rescan_errors", errors: result.errors });
-    }
-    // Restart watcher on new directory
+  // Fire-and-forget — progress/completion events will push via SSE
+  void scanInWorker(musicDir, dbPath).then(() => {
     watchMusicDirectory(musicDir, dbPath);
   });
 
-  return ServerSentEventGenerator.stream(c.req.raw, (sse) => {
+  return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
       `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Saved! Scanning library…</div>`
     );
   });
 });
 
-/** POST /s/:id/settings/rescan — Rescan library without changing settings */
-router.post("/s/:id/settings/rescan", async (c) => {
+/** POST /s/:id/settings/rescan — Rescan library */
+router.post("/s/:id/settings/rescan", (c) => {
   const sessionId = c.req.param("id");
   if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
 
@@ -77,12 +72,35 @@ router.post("/s/:id/settings/rescan", async (c) => {
     });
   }
 
-  const result = await scanMusicDirectory(musicDir, db);
-  log.info({ action: "manual_rescan_complete", tracks: result.tracks, albums: result.albums, artists: result.artists });
+  void scanInWorker(musicDir, dbPath);
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
-      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Rescan complete: ${result.tracks} tracks, ${result.albums} albums, ${result.artists} artists</div>`
+      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Scanning… Library will update in real time.</div>`
+    );
+  });
+});
+
+/** POST /s/:id/settings/clear-rescan — Clear library and rescan from scratch */
+router.post("/s/:id/settings/clear-rescan", (c) => {
+  const sessionId = c.req.param("id");
+  if (!getSessionProjection(db, sessionId)) return c.text("Session not found", 404);
+
+  const config = readConfig();
+  const musicDir = config.dir;
+  if (!musicDir) {
+    return ServerSentEventGenerator.stream((sse) => {
+      sse.patchElements(
+        `<div id="feedback" style="color: #ef4444; font-size: 13px; margin-top: 12px;">No music directory configured.</div>`
+      );
+    });
+  }
+
+  void scanInWorker(musicDir, dbPath, true);
+
+  return ServerSentEventGenerator.stream((sse) => {
+    sse.patchElements(
+      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Cleared! Rescanning from scratch…</div>`
     );
   });
 });

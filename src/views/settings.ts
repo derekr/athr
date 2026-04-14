@@ -1,4 +1,4 @@
-import { html, raw } from "hono/html";
+import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getSettings } from "../projections/settings";
 import { db } from "../app";
@@ -53,7 +53,7 @@ export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promi
                data-bind:musicDir
                placeholder="/path/to/your/Music" />
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <button type="submit"
           data-on:click__prevent="@post('/s/${sessionId}/settings/update')">
           Save &amp; Rescan
@@ -61,7 +61,12 @@ export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promi
         <button type="submit"
           data-on:click__prevent="@post('/s/${sessionId}/settings/rescan')"
           style="background: var(--surface2); border: 1px solid var(--border);">
-          Rescan Only
+          Rescan
+        </button>
+        <button type="submit"
+          data-on:click__prevent="@post('/s/${sessionId}/settings/clear-rescan')"
+          style="background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);">
+          Clear &amp; Rescan
         </button>
       </div>
     </div>

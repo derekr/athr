@@ -100,6 +100,16 @@ async function onSettingsUpdatedMain(s: Writer, sessionId: string): Promise<void
   await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
 }
 
+async function onCatalogueChangedMain(s: Writer, sessionId: string, eventType: string): Promise<void> {
+  // Re-render library view on scan completion (content may have changed)
+  if (eventType === "ScanComplete") {
+    const session = getSessionProjection(db, sessionId);
+    if (session && ["library", "album", "artist"].includes(session.current_view)) {
+      await s.write(patchElements(renderView(sessionId, session), "#content", "inner"));
+    }
+  }
+}
+
 // ── Event dispatch ──────────────────────────────────────────
 
 function handleMainEvent(event: BusEvent, s: Writer, sessionId: string): void {
@@ -172,6 +182,11 @@ router.get("/s/:id/sse", (c) => {
         handleMainEvent(event, s, sessionId);
       } else {
         handleMiniEvent(event, s, sessionId);
+      }
+    },
+    onGlobalEvent(event, s) {
+      if (ctx === "main" && event.streamId === "catalogue") {
+        void onCatalogueChangedMain(s, sessionId, event.eventType);
       }
     },
   });
