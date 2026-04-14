@@ -39,7 +39,7 @@ export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promi
     #feedback { min-height: 20px; }
   </style>
 </head>
-<body>
+<body data-init="@get('/s/${sessionId}/settings/sse')">
   <div data-signals:music-dir="'${musicDir}'"></div>
 
   <h1>Settings</h1>

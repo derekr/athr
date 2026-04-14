@@ -6,6 +6,8 @@ import { renderSettingsPage } from "../views/settings";
 import { readConfig, updateConfig } from "../lib/config";
 import { runScan, watchMusicDirectory } from "../lib/music-watcher";
 import { getSessionVersion } from "../lib/session-version";
+import { createSSEStream } from "../lib/sse-stream";
+import { patchElements } from "../lib/sse";
 
 const router = new Hono();
 
@@ -75,7 +77,7 @@ router.post("/s/:id/settings/rescan", (c) => {
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
-      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Scanning… Library will update in real time.</div>`
+      `<div id="feedback" style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">Scanning…</div>`
     );
   });
 });
@@ -99,8 +101,42 @@ router.post("/s/:id/settings/clear-rescan", (c) => {
 
   return ServerSentEventGenerator.stream((sse) => {
     sse.patchElements(
-      `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Cleared! Rescanning from scratch…</div>`
+      `<div id="feedback" style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">Clearing &amp; rescanning…</div>`
     );
+  });
+});
+
+/** GET /s/:id/settings/sse — Settings SSE for scan feedback */
+router.get("/s/:id/settings/sse", (c) => {
+  const sessionId = c.req.param("id");
+
+  return createSSEStream(c, {
+    sessionId,
+    streamId: `session:${sessionId}`,
+    async onInit() { /* no initial state needed */ },
+    onEvent() { /* session events not relevant here */ },
+    onGlobalEvent(event, s) {
+      if (event.streamId !== "catalogue") return;
+
+      if (event.eventType === "ScanProgress") {
+        const d = event.data as { processed: number; total: number; added: number };
+        void s.write(patchElements(
+          `<div id="feedback" style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">Scanning… ${d.processed}/${d.total} files (${d.added} new)</div>`,
+          "#feedback", "outer"
+        ));
+      } else if (event.eventType === "ScanComplete") {
+        const d = event.data as { tracks: number; albums: number; artists: number; added: number; removed: number };
+        void s.write(patchElements(
+          `<div id="feedback" style="color: #4ade80; font-size: 13px; margin-top: 12px;">Done: ${d.tracks} tracks, ${d.albums} albums (${d.added} added, ${d.removed} removed)</div>`,
+          "#feedback", "outer"
+        ));
+      } else if (event.eventType === "CatalogueCleared") {
+        void s.write(patchElements(
+          `<div id="feedback" style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">Library cleared, scanning…</div>`,
+          "#feedback", "outer"
+        ));
+      }
+    },
   });
 });
 
