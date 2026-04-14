@@ -1,4 +1,4 @@
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getSettings } from "../projections/settings";
 import { db } from "../app";
@@ -40,7 +40,7 @@ export function renderSettingsPage(sessionId: string): HtmlEscapedString | Promi
   </style>
 </head>
 <body>
-  <div data-signals:music-dir="${musicDir}"></div>
+  <div data-signals:music-dir="'${musicDir}'"></div>
 
   <h1>Settings</h1>
 
